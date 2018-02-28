@@ -1,0 +1,132 @@
+/* OSM2KM4C
+   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
+
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU Affero General Public License as
+   published by the Free Software Foundation, either version 3 of the
+   License, or (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU Affero General Public License for more details.
+
+   You should have received a copy of the GNU Affero General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
+
+Prefix km4c:<http://www.disit.org/km4city/schema#>
+Prefix dct:<http://purl.org/dc/terms/>
+Prefix foaf:<http://xmlns.com/foaf/0.1/>
+Prefix geo:<http://www.w3.org/2003/01/geo/wgs84_pos#>
+Prefix fn:<http://aksw.org/sparqlify/>
+Prefix rdf:<http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+Prefix rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+
+/***************************************
+*********** TurnRestrictions ***********
+****************************************/
+
+Create View TurnRestrictions As
+
+Construct {
+Graph ?graph_uri {
+	?s a km4c:TurnRestriction;
+           a km4c:Restriction;
+	   km4c:where ?from;
+	   km4c:toward ?to;
+	   km4c:node ?node_uri;
+	   km4c:restriction ?restriction .
+	km4c:TurnRestriction rdfs:subClassOf km4c:Restriction
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?from_uri, "/restriction/turn/", ?to_uri))
+?from = uri(concat("http://www.disit.org/km4city/resource/", ?from_uri))
+?to = uri(concat("http://www.disit.org/km4city/resource/", ?to_uri))
+?node_uri = uri(concat("http://www.disit.org/km4city/resource/", ?node_uri))
+?restriction = plainLiteral(?restriction)
+
+From [[
+select * from turn_restrictions
+]]
+
+Create View TurnRestrictionsDayOn As
+
+Construct {
+Graph ?graph_uri {
+	?s km4c:day_on ?day_on
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?from_uri, "/restriction/turn/", ?to_uri))
+?day_on = plainLiteral(?day_on)
+
+From [[
+select * from turn_restrictions where day_on is not null
+]]
+
+Create View TurnRestrictionsDayOff As
+
+Construct {
+Graph ?graph_uri {
+	?s km4c:day_off ?day_off
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?from_uri, "/restriction/turn/", ?to_uri))
+?day_off = plainLiteral(?day_off)
+
+From [[
+select * from turn_restrictions where day_off is not null
+]]
+
+Create View TurnRestrictionsHourOn As
+
+Construct {
+Graph ?graph_uri {
+	?s km4c:hour_on ?hour_on
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?from_uri, "/restriction/turn/", ?to_uri))
+?hour_on = plainLiteral(?hour_on)
+
+From [[
+select * from turn_restrictions where hour_on is not null
+]]
+
+Create View TurnRestrictionsHourOff As
+
+Construct {
+Graph ?graph_uri {
+	?s km4c:hour_off ?hour_off
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?from_uri, "/restriction/turn/", ?to_uri))
+?hour_off = plainLiteral(?hour_off)
+
+From [[
+select * from turn_restrictions where hour_off is not null
+]]
+
+Create View TurnRestrictionsHourOff As
+
+Construct {
+Graph ?graph_uri {
+	?s km4c:except ?except
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?from_uri, "/restriction/turn/", ?to_uri))
+?except = plainLiteral(?exceptions)
+
+From [[
+select * from turn_restrictions where exceptions is not null
+]]

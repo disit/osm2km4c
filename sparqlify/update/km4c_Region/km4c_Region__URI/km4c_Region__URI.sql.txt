@@ -1,0 +1,84 @@
+/* OSM2KM4C
+   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
+
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU Affero General Public License as
+   published by the Free Software Foundation, either version 3 of the
+   License, or (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU Affero General Public License for more details.
+
+   You should have received a copy of the GNU Affero General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
+
+-- CONFIGURAZIONE DELL'INSTALLAZIONE
+------------------------------------
+
+-- Delimitazione geografica dell'installazione
+
+drop table if exists extra_config_boundaries; 
+
+create table extra_config_boundaries as 
+select * from extra_all_boundaries where relation_id in (276369);
+
+create index extra_config_boundaries_index_1 on extra_config_boundaries using gist(boundary);
+
+create index extra_config_boundaries_index_2 on extra_config_boundaries using gist(bbox);
+
+create index extra_config_boundaries_index_3 on extra_config_boundaries using gist(centroid);
+
+-- Grafo
+
+drop table if exists extra_config_graph ;
+
+create table extra_config_graph (
+id serial primary key,
+graph_uri varchar(255)
+);
+
+insert into extra_config_graph(graph_uri) values ('http://www.disit.org/km4city/graph/OSM/CA'); 
+
+-- Utilizzo dei numeri civici della Regione Toscana piuttosto che nativi di OSM
+
+drop table if exists extra_config_civic_num ;
+
+create table extra_config_civic_num (
+id serial primary key,
+civic_num_source varchar(255)
+);
+
+-- insert into extra_config_civic_num(civic_num_source) values ('Regione Toscana'); -- decommentare questa riga per utilizzare i numeri civici della Regione Toscana
+insert into extra_config_civic_num(civic_num_source) values ('Open Street Map'); -- decommentare questa riga per utilizzare i numeri civici nativi di Open Street Map
+
+/*** Confini delle regioni ***/
+
+drop table if exists extra_regioni;
+
+create table extra_regioni as
+select relations.id relation_id, extra_all_boundaries.centroid, extra_all_boundaries.boundary boundary, extra_all_boundaries.bbox bbox
+from relations 
+join relation_tags tag_type on relations.id = tag_type.relation_id and tag_type.k = 'type' and tag_type.v = 'boundary'
+join relation_tags boundary on relations.id = boundary.relation_id and boundary.k = 'boundary' and boundary.v = 'administrative'
+join relation_tags admin_level on relations.id = admin_level.relation_id and admin_level.k = 'admin_level' and admin_level.v = '4' 
+join extra_all_boundaries on relations.id = extra_all_boundaries.relation_id
+join extra_config_boundaries on ST_Covers(extra_all_boundaries.boundary, extra_config_boundaries.boundary);
+
+create index extra_regioni_index_1 on extra_regioni using gist(centroid);
+
+create index extra_regioni_index_2 on extra_regioni using gist(boundary);
+
+create index extra_regioni_index_3 on extra_regioni using gist(bbox);
+
+drop table if exists RegionURI ;
+
+Create table RegionURI As
+  select distinct graph_uri, 'OS' || lpad(r.id::text,11,'0') || 'RG' id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'boundary'
+  join relation_tags r_boundary on r.id = r_boundary.relation_id and r_boundary.k = 'boundary' and r_boundary.v = 'administrative'
+  join relation_tags r_admin_level on r.id = r_admin_level.relation_id and r_admin_level.k = 'admin_level' and r_admin_level.v = '4'
+  join extra_regioni region_of_interest on r.id = region_of_interest.relation_id 
+  join extra_config_graph cfg on 1=1;

@@ -1,0 +1,155 @@
+# 	OSM2KM4C
+#   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU Affero General Public License as
+#   published by the Free Software Foundation, either version 3 of the
+#   License, or (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU Affero General Public License for more details.
+#
+#   You should have received a copy of the GNU Affero General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX units: <http://www.opengis.net/def/uom/OGC/1.0/>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX geo: <http://www.w3.org/2003/01/geo/wgs84_pos#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+
+construct 
+{
+  graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/Road/ComuneGrosseto> {
+    ?r2 owl:sameAs ?tr2 .
+    ?tr2 owl:sameAs ?r2 .
+  }
+}
+WHERE {
+
+  graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/Road/ComuneGrosseto> {
+    ?r owl:sameAs ?tr .
+    ?tr owl:sameAs ?r .
+  }
+
+  filter not exists { graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/Road/ComuneGrosseto> { ?r2 owl:sameAs ?something } }
+  filter not exists { graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/Road/ComuneGrosseto> { ?tr2 owl:sameAs ?somethingelse } }
+
+ graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/RT_Graph/ComuneGrosseto> {
+    {
+      ?tn a km4c:Node. 
+      ?te1 km4c:startsAtNode ?tn.
+      ?te2 km4c:startsAtNode ?tn.
+      ?tr km4c:containsElement ?te1 .
+      ?tr2 km4c:containsElement ?te2 .
+      ?tr km4c:extendName ?ten .
+      ?tr2 km4c:extendName ?ten2 .
+      ?tr2 km4c:roadName ?trn2 .
+      filter ( ?ten != ?ten2 ) .
+    }
+    UNION
+    {
+      ?tn a km4c:Node. 
+      ?te1 km4c:startsAtNode ?tn.
+      ?te2 km4c:endsAtNode ?tn.
+      ?tr km4c:containsElement ?te1 .
+      ?tr2 km4c:containsElement ?te2 .
+      ?tr km4c:extendName ?ten .
+      ?tr2 km4c:extendName ?ten2 .
+      ?tr2 km4c:roadName ?trn2 .
+      filter ( ?ten != ?ten2 ) .
+    }
+    UNION
+    {
+      ?tn a km4c:Node. 
+      ?te1 km4c:endsAtNode ?tn.
+      ?te2 km4c:startsAtNode ?tn.
+      ?tr km4c:containsElement ?te1 .
+      ?tr2 km4c:containsElement ?te2 .
+      ?tr km4c:extendName ?ten .
+      ?tr2 km4c:extendName ?ten2 .
+      ?tr2 km4c:roadName ?trn2 .
+      filter ( ?ten != ?ten2 ) .
+    }
+    UNION
+    {
+      ?tn a km4c:Node. 
+      ?te1 km4c:endsAtNode ?tn.
+      ?te2 km4c:endsAtNode ?tn.
+      ?tr km4c:containsElement ?te1 .
+      ?tr2 km4c:containsElement ?te2 .
+      ?tr km4c:extendName ?ten .
+      ?tr2 km4c:extendName ?ten2 .
+      ?tr2 km4c:roadName ?trn2 .
+      filter ( ?ten != ?ten2 ) .
+    }
+  }
+ 
+  graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/OSM_Graph/ComuneGrosseto> {
+    {
+      ?n a km4c:Node. 
+      ?e1 km4c:startsAtNode ?n.
+      ?e2 km4c:startsAtNode ?n.
+      ?r km4c:containsElement ?e1 .
+      ?r2 km4c:containsElement ?e2 .
+      ?r km4c:extendName ?en .
+      ?r2 km4c:extendName ?en2 .
+      ?r2 km4c:roadName ?rn2 .
+      filter ( ?en != ?en2 ) .
+    }
+    UNION
+    {
+      ?n a km4c:Node. 
+      ?e1 km4c:startsAtNode ?n.
+      ?e2 km4c:endsAtNode ?n.
+      ?r km4c:containsElement ?e1 .
+      ?r2 km4c:containsElement ?e2 .
+      ?r km4c:extendName ?en .
+      ?r2 km4c:extendName ?en2 .
+      ?r2 km4c:roadName ?rn2 .
+      filter ( ?en != ?en2 ) .
+    }
+    UNION
+    {
+      ?n a km4c:Node. 
+      ?e1 km4c:endsAtNode ?n.
+      ?e2 km4c:startsAtNode ?n.
+      ?r km4c:containsElement ?e1 .
+      ?r2 km4c:containsElement ?e2 .
+      ?r km4c:extendName ?en .
+      ?r2 km4c:extendName ?en2 .
+      ?r2 km4c:roadName ?rn2 .
+      filter ( ?en != ?en2 ) .
+    }
+    UNION
+    {
+      ?n a km4c:Node. 
+      ?e1 km4c:endsAtNode ?n.
+      ?e2 km4c:endsAtNode ?n.
+      ?r km4c:containsElement ?e1 .
+      ?r2 km4c:containsElement ?e2 .
+      ?r km4c:extendName ?en .
+      ?r2 km4c:extendName ?en2 .
+      ?r2 km4c:roadName ?rn2 .
+      filter ( ?en != ?en2 ) .
+    }
+  }
+
+#1 filter(regex(?ten2,concat(?en2,"$"),"i") || regex(?en2,concat(?ten2,"$"),"i")) # il RT extendName finisce con l'OSM extendName o viceversa
+#2 filter(regex(?ten2,concat("^",?en2),"i") || regex(?en2,concat("^",?ten2),"i")) # il RT extendName inizia con l'OSM extendName o viceversa
+#3 filter(regex(?ten2, ?en2, "i") || regex(?en2, ?ten2, "i" )) # nel RT extendName ci sono tutte le parole dell'OSM extendName o viceversa
+#4 filter(?trn2 = ?rn2) # i roadName sono uguali
+#5 filter(regex(?trn2,concat(?rn2,"$"),"i") || regex(?rn2,concat(?trn2,"$"),"i")) # il RT roadName finisce con l'OSM roadName o viceversa
+#6 filter(regex(?trn2,concat("^",?rn2),"i") || regex(?rn2,concat("^",?trn2),"i")) # il RT roadName inizia con l'OSM roadName o viceversa
+#7 filter(regex(?trn2, ?rn2, "i") || regex(?rn2, ?trn2, "i" )) # il RT roadName contiene tutte le parole dell'OSM roadName o viceversa
+#8 filter( regex( str(?trn2), concat("\\b(",replace(str(?rn2),"^.*\\s\\b(?=.*$)",""),")\\b") , "i") ) # ultima parola del roadName OSM contro tutto il roadName RT
+#9 filter( regex( str(?rn2), concat("\\b(",replace(str(?trn2),"^.*\\s\\b(?=.*$)",""),")\\b") , "i") ) # viceversa della # 8
+#10 eseguire road_extra_1.sparql, memorizzare le eventuali corrispondenze, e rieseguire la stessa query, finché non restituisce zero nuove corrispondenze
+#11 eseguire road_extra_2.sparql, memorizzare le eventuali corrispondenze, e rieseguire la stessa query, finché non restituisce zero nuove corrispondenze
+#11 filter(regex(str(?trn2), replace(?rn2," ",""), "i") )
+#12 filter(regex(str(?rn2), replace(?trn2," ",""), "i") )
+#13 eseguire road_extra_3.sparql, memorizzare le eventuali corrispondenze, e rieseguire la stessa query, finché non restituisce zero nuove corrispondenze
+
+}

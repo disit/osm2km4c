@@ -1,0 +1,50 @@
+# 	OSM2KM4C
+#   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU Affero General Public License as
+#   published by the Free Software Foundation, either version 3 of the
+#   License, or (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU Affero General Public License for more details.
+#
+#   You should have received a copy of the GNU Affero General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX units: <http://www.opengis.net/def/uom/OGC/1.0/>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX geo: <http://www.w3.org/2003/01/geo/wgs84_pos#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+
+construct 
+{
+  graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/Road/ComuneGrosseto> {
+    ?r2 owl:sameAs ?tr .
+    ?tr owl:sameAs ?r2 .
+  }
+}
+WHERE {
+
+  graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/OSM_Graph/ComuneGrosseto> {
+    ?r a km4c:Road ;
+      km4c:extendName ?n .
+    ?r2 a km4c:Road ;
+      km4c:extendName ?n .
+    filter( ?r != ?r2 )
+  }
+
+  graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/Road/ComuneGrosseto> {
+    ?r owl:sameAs ?tr .
+  }
+
+  graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/RT_Graph/ComuneGrosseto> {
+    ?tr a km4c:Road . 
+  }
+
+  filter not exists { graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/Road/ComuneGrosseto> { ?r2 owl:sameAs ?something } }
+
+}

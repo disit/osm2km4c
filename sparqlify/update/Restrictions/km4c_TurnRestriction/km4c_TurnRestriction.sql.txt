@@ -1,0 +1,419 @@
+/* OSM2KM4C
+   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
+
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU Affero General Public License as
+   published by the Free Software Foundation, either version 3 of the
+   License, or (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU Affero General Public License for more details.
+
+   You should have received a copy of the GNU Affero General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
+
+-- CONFIGURAZIONE DELL'INSTALLAZIONE
+------------------------------------
+
+-- Delimitazione geografica dell'installazione
+
+drop table if exists extra_config_boundaries; 
+
+create table extra_config_boundaries as 
+select * from extra_all_boundaries where relation_id in (42472);
+
+create index extra_config_boundaries_index_1 on extra_config_boundaries using gist(boundary);
+
+create index extra_config_boundaries_index_2 on extra_config_boundaries using gist(bbox);
+
+create index extra_config_boundaries_index_3 on extra_config_boundaries using gist(centroid);
+
+-- Grafo
+
+drop table if exists extra_config_graph ;
+
+create table extra_config_graph (
+id serial primary key,
+graph_uri varchar(255)
+);
+
+insert into extra_config_graph(graph_uri) values ('http://www.disit.org/km4city/graph/OSM/CA'); 
+
+-- Utilizzo dei numeri civici della Regione Toscana piuttosto che nativi di OSM
+
+drop table if exists extra_config_civic_num ;
+
+create table extra_config_civic_num (
+id serial primary key,
+civic_num_source varchar(255)
+);
+
+-- insert into extra_config_civic_num(civic_num_source) values ('Regione Toscana'); -- decommentare questa riga per utilizzare i numeri civici della Regione Toscana
+insert into extra_config_civic_num(civic_num_source) values ('Open Street Map'); -- decommentare questa riga per utilizzare i numeri civici nativi di Open Street Map
+
+/********************************************
+************ TABELLE DI APPOGGIO ************
+*********************************************/
+
+-- Esplosione delle way
+
+drop table if exists extra_ways;
+
+create table extra_ways as
+select prev_waynode.way_id global_id, prev_waynode.sequence_id local_id, prev_node.geom start_node, next_node.geom end_node, prev_node.id prev_node_id, next_node.id next_node_id
+from way_nodes prev_waynode 
+join nodes prev_node on prev_waynode.node_id = prev_node.id
+join way_nodes next_waynode on prev_waynode.way_id = next_waynode.way_id and prev_waynode.sequence_id = next_waynode.sequence_id-1
+join nodes next_node on next_waynode.node_id = next_node.id
+join way_tags on prev_waynode.way_id = way_tags.way_id and way_tags.k = 'highway' and way_tags.v <> 'proposed'
+join extra_config_boundaries boundaries on ST_Covers(boundaries.boundary, next_node.geom);
+
+create index on extra_ways (global_id);
+
+create index on extra_ways using gist(start_node);
+
+create index on extra_ways using gist(end_node);
+
+-- Comuni di interesse
+
+drop table if exists extra_comuni;
+
+create table extra_comuni as
+select relations.id relation_id, extra_all_boundaries.centroid, extra_all_boundaries.boundary boundary, extra_all_boundaries.bbox bbox
+from relations 
+join relation_tags tag_type on relations.id = tag_type.relation_id and tag_type.k = 'type' and tag_type.v = 'boundary'
+join relation_tags boundary on relations.id = boundary.relation_id and boundary.k = 'boundary' and boundary.v = 'administrative'
+join relation_tags admin_level on relations.id = admin_level.relation_id and admin_level.k = 'admin_level' and admin_level.v = '8' 
+-- join relation_tags catasto on relations.id = catasto.relation_id and catasto.k = 'ref:catasto' -- taglio sugli italiani
+join extra_all_boundaries on relations.id = extra_all_boundaries.relation_id
+join extra_config_boundaries on ST_Covers(extra_config_boundaries.boundary, extra_all_boundaries.boundary);
+
+create index extra_comuni_index_1 on extra_comuni using gist(centroid);
+
+create index extra_comuni_index_2 on extra_comuni using gist(boundary);
+
+create index extra_comuni_index_3 on extra_comuni using gist(bbox);
+
+-- Province di interesse
+
+drop table if exists extra_province;
+
+create table extra_province as
+select relations.id relation_id, extra_all_boundaries.centroid, extra_all_boundaries.boundary boundary, extra_all_boundaries.bbox bbox
+from relations 
+join relation_tags tag_type on relations.id = tag_type.relation_id and tag_type.k = 'type' and tag_type.v = 'boundary'
+join relation_tags boundary on relations.id = boundary.relation_id and boundary.k = 'boundary' and boundary.v = 'administrative'
+join relation_tags admin_level on relations.id = admin_level.relation_id and admin_level.k = 'admin_level' and admin_level.v = '6' 
+join extra_all_boundaries on relations.id = extra_all_boundaries.relation_id
+join extra_config_boundaries on ST_Covers(extra_config_boundaries.boundary, extra_all_boundaries.boundary);
+
+create index extra_province_index_1 on extra_province using gist(centroid);
+
+create index extra_province_index_2 on extra_province using gist(boundary);
+
+create index extra_province_index_3 on extra_province using gist(bbox);
+
+-- Corrispondenze tra comuni e province
+
+drop table if exists extra_city_county ;
+
+create table extra_city_county as
+select extra_comuni.relation_id comune, province_short_name.v provincia
+from extra_comuni, extra_province, relation_tags province_short_name
+where ST_Covers(extra_province.boundary,extra_comuni.boundary)
+and extra_province.relation_id = province_short_name.relation_id
+and province_short_name.k = 'short_name';
+
+-- Quartieri
+
+drop table if exists extra_suburbs;
+
+create table extra_suburbs as
+select suburb.id, suburb.centroid, suburb.boundary, suburb.suburb_type, suburb.suburb_name, extra_comuni.relation_id municipality_id
+from 
+(
+-- suburb ways
+select ways.id, 
+	ST_GeomFromText(ST_AsText(ST_Centroid(ST_ConvexHull(ST_Collect(ways.linestring)))),4326) centroid, 
+	ST_GeomFromText(ST_AsText(ST_ConvexHull(ST_Collect(linestring))),4326) boundary, 
+	'W'::text suburb_type, way_suburb_name.v suburb_name 
+from ways
+join way_tags boundary on ways.id = boundary.way_id and boundary.k = 'boundary' and boundary.v = 'administrative'
+join way_tags admin_level on ways.id = admin_level.way_id and admin_level.k = 'admin_level' and cast(admin_level.v as int) > 8 
+join way_tags way_suburb_name on ways.id = way_suburb_name.way_id and way_suburb_name.k = 'name'
+group by ways.id, way_suburb_name.v
+union
+-- suburb relations
+select rsuburbs.*, rel_suburb_name.v suburb_name from 
+(
+select relation_id id, 
+	ST_GeomFromText(ST_AsText(ST_Centroid(ST_ConvexHull(ST_Collect(linestring)))),4326) centroid, 
+	ST_GeomFromText(ST_AsText(ST_ConvexHull(ST_Collect(linestring))),4326) boundary, 
+	'R'::text suburb_type from ( 
+	select relation_members.relation_id, ways.linestring
+	from relation_members 
+	join ways on ways.id = relation_members.member_id and relation_members.member_type='W' 
+	join relation_tags tag_type on relation_members.relation_id = tag_type.relation_id and tag_type.k = 'type' and tag_type.v = 'boundary'
+	join relation_tags boundary on relation_members.relation_id = boundary.relation_id and boundary.k = 'boundary' and boundary.v = 'administrative'
+	join relation_tags admin_level on relation_members.relation_id = admin_level.relation_id and admin_level.k = 'admin_level' and cast(admin_level.v as int) > 8 
+ ) sub group by relation_id
+) rsuburbs 
+join relation_tags rel_suburb_name on rsuburbs.id = rel_suburb_name.relation_id and rel_suburb_name.k = 'name'
+union
+-- suburb nodes
+select id, geom centroid, geom boundary, 'N'::text suburb_type, nd_suburb_name.v suburb_name from nodes join node_tags on nodes.id = node_tags.node_id and node_tags.k = 'place' and node_tags.v = 'suburb' join node_tags nd_suburb_name on nodes.id = nd_suburb_name.node_id and nd_suburb_name.k = 'name'
+) suburb
+join extra_comuni on ST_Covers(extra_comuni.boundary, suburb.boundary)
+;
+
+create index extra_suburbs_index_1 on extra_suburbs using gist(centroid);
+
+create index extra_suburbs_index_2 on extra_suburbs using gist(boundary);
+
+-- Corrispondenze tra elementi stradali, comuni e quartieri
+
+drop table if exists extra_toponym_city ;
+
+create table extra_toponym_city (
+	id serial primary key,
+	global_way_id bigint,
+	local_way_id int,
+	city varchar(255), 		
+	suburb varchar(255)		
+);
+
+insert into extra_toponym_city(global_way_id, local_way_id, city) 
+select highways.global_id global_way_id,
+highways.local_id local_way_id,
+nome_comune.v city 
+from 
+(
+-- ways in relation roads
+select extra_ways.global_id, extra_ways.local_id, 
+extra_ways.start_node start_pt,
+extra_ways.end_node end_pt
+from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+  join extra_ways on rwt.way_id = extra_ways.global_id 
+ where COALESCE(r_route.v,'road') = 'road'
+   and COALESCE(r_network.v, '--') <> 'e-road' 
+   and rwt.v <> 'proposed'
+union
+-- ways in relation pedestrian multipolygon 
+select extra_ways.global_id, extra_ways.local_id, 
+extra_ways.start_node start_pt,
+extra_ways.end_node end_pt
+from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'multipolygon'
+  join relation_tags r_pedestrian on r.id = r_pedestrian.relation_id and r_pedestrian.k = 'highway' and r_pedestrian.v = 'pedestrian'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join extra_ways on r_ways.member_id = extra_ways.global_id 
+union
+-- ways that are roads
+select extra_ways.global_id, extra_ways.local_id, 
+extra_ways.start_node start_pt,
+extra_ways.end_node end_pt
+from way_tags wt
+join extra_ways on wt.way_id = extra_ways.global_id
+  left join relation_members rm on rm.member_type = 'W' and rm.member_id = wt.way_id and rm.relation_id in 
+(
+select r.id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+ where COALESCE(r_route.v,'road') = 'road'
+   and COALESCE(r_network.v, '--') <> 'e-road' 
+   and rwt.v <> 'proposed'  
+)
+ where wt.k = 'highway' 
+   and wt.v <> 'proposed'
+   and rm.member_id is null
+) highways
+join extra_comuni comuni on ST_Covers(comuni.boundary, highways.start_pt) or ST_Covers(comuni.boundary, highways.end_pt)
+join relation_tags nome_comune on comuni.relation_id = nome_comune.relation_id and nome_comune.k = 'name';
+
+update extra_toponym_city 
+set suburb = suburb.suburb_name
+from (
+
+select i_suburb.global_way_id, i_suburb.local_way_id, suburb_name from (
+select highways.global_way_id, highways.local_way_id,
+coalesce(way_suburb_name.v, rel_suburb_name.v) suburb_name,
+dense_rank() over (partition by highways.global_way_id, highways.local_way_id, coalesce(way_suburb_name.v, rel_suburb_name.v) order by cast(coalesce(way_suburb_level.v, rel_suburb_level.v) as int) desc) suburb_rank
+from
+(
+-- ways in relation roads
+select extra_ways.global_id global_way_id, extra_ways.local_id local_way_id, 
+extra_ways.start_node start_pt,
+extra_ways.end_node end_pt
+from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+  join extra_ways on rwt.way_id = extra_ways.global_id 
+ where COALESCE(r_route.v,'road') = 'road'
+   and COALESCE(r_network.v, '--') <> 'e-road' 
+   and rwt.v <> 'proposed'
+union
+-- ways in relation pedestrian multipolygon 
+select extra_ways.global_id, extra_ways.local_id, 
+extra_ways.start_node start_pt,
+extra_ways.end_node end_pt
+from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'multipolygon'
+  join relation_tags r_pedestrian on r.id = r_pedestrian.relation_id and r_pedestrian.k = 'highway' and r_pedestrian.v = 'pedestrian'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join extra_ways on r_ways.member_id = extra_ways.global_id 
+union
+-- ways that are roads
+select extra_ways.global_id global_way_id, extra_ways.local_id local_way_id, 
+extra_ways.start_node start_pt,
+extra_ways.end_node end_pt
+from way_tags wt
+join extra_ways on wt.way_id = extra_ways.global_id
+  left join relation_members rm on rm.member_type = 'W' and rm.member_id = wt.way_id and rm.relation_id in 
+(
+select r.id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+ where COALESCE(r_route.v,'road') = 'road'
+   and COALESCE(r_network.v, '--') <> 'e-road' 
+   and rwt.v <> 'proposed'  
+)
+ where wt.k = 'highway' 
+   and wt.v <> 'proposed'
+   and rm.member_id is null
+) highways
+join extra_suburbs st_end_suburb on ST_Covers(st_end_suburb.boundary, highways.start_pt) and ST_Covers(st_end_suburb.boundary, highways.end_pt)
+left join way_tags way_suburb_name on st_end_suburb.id = way_suburb_name.way_id and way_suburb_name.k = 'name'
+left join relation_tags rel_suburb_name on st_end_suburb.id = rel_suburb_name.relation_id and rel_suburb_name.k = 'name'
+left join way_tags way_suburb_level on st_end_suburb.id = way_suburb_level.way_id and way_suburb_level.k = 'admin_level'
+left join relation_tags rel_suburb_level on st_end_suburb.id = rel_suburb_level.relation_id and rel_suburb_level.k = 'admin_level'
+
+) i_suburb where suburb_rank = 1
+
+) suburb 
+where extra_toponym_city.global_way_id = suburb.global_way_id and extra_toponym_city.local_way_id = suburb.local_way_id;
+
+-- Turn Restrictions
+
+drop table if exists turn_restrictions;
+
+/*
+create table turn_restrictions as
+select graph.graph_uri, 
+case when not from_relation.relation_uri is null then from_relation.relation_uri else 'OS' || lpad(from_way.member_id::text,11,'0') || 'SR' end from_uri, 
+case when not to_relation.relation_uri is null then to_relation.relation_uri else 'OS' || lpad(to_way.member_id::text,11,'0') || 'SR' end to_uri, 
+'OS' || lpad(via.member_id::text,11,'0') || 'NO' node_uri,
+restriction_tag.v restriction,
+tag_day_on.v day_on,
+tag_day_off.v day_off,
+tag_hour_on.v hour_on,
+tag_hour_off.v hour_off,
+tag_except.v exceptions 
+from relation_tags relation_type
+join relation_members from_way on relation_type.relation_id = from_way.relation_id and from_way.member_type = 'W' and from_way.member_role = 'from'
+join relation_members to_way on relation_type.relation_id = to_way.relation_id and to_way.member_type = 'W' and to_way.member_role = 'to'
+join relation_members via on relation_type.relation_id = via.relation_id and via.member_role = 'via' and via.member_type = 'N'
+left join way_nodes via_way on via.member_type = 'W' and via.member_id = via_way.way_id and via_way.sequence_id = 0
+left join nodes via_way_node on via_way.node_id = via_way_node.id
+left join nodes via_node on via.member_type = 'N' and via.member_id = via_node.id
+join relation_tags restriction_tag on relation_type.relation_id = restriction_tag.relation_id and restriction_tag.k = 'restriction'
+left join (
+select distinct 'OS' || lpad(r.id::text,11,'0') || 'LR' relation_uri, r_ways.member_id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+  join extra_toponym_city e on r_ways.member_id = e.global_way_id 
+ where COALESCE(r_route.v,'road') = 'road'
+   and COALESCE(r_network.v, '--') <> 'e-road' 
+   and rwt.v <> 'proposed'  
+ union -- pedestrian relations (squares)
+select 'OS' || lpad(r.id::text,11,'0') || 'SQ' relation_uri, r_ways.member_id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'multipolygon'
+  join relation_tags r_pedestrian on r.id = r_pedestrian.relation_id and r_pedestrian.k = 'highway' and r_pedestrian.v = 'pedestrian'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join extra_toponym_city e on r_ways.member_id = e.global_way_id 
+) from_relation on from_relation.member_id = from_way.member_id
+left join (
+select distinct 'OS' || lpad(r.id::text,11,'0') || 'LR' relation_uri, r_ways.member_id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+  join extra_toponym_city e on r_ways.member_id = e.global_way_id 
+ where COALESCE(r_route.v,'road') = 'road'
+   and COALESCE(r_network.v, '--') <> 'e-road' 
+   and rwt.v <> 'proposed'  
+ union -- pedestrian relations (squares)
+select 'OS' || lpad(r.id::text,11,'0') || 'SQ' relation_uri, r_ways.member_id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'multipolygon'
+  join relation_tags r_pedestrian on r.id = r_pedestrian.relation_id and r_pedestrian.k = 'highway' and r_pedestrian.v = 'pedestrian'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join extra_toponym_city e on r_ways.member_id = e.global_way_id 
+) to_relation on to_relation.member_id = to_way.member_id
+left join relation_tags tag_day_on on relation_type.relation_id = tag_day_on.relation_id and tag_day_on.k = 'day_on'
+left join relation_tags tag_day_off on relation_type.relation_id = tag_day_off.relation_id and tag_day_off.k = 'day_off'
+left join relation_tags tag_hour_on on relation_type.relation_id = tag_hour_on.relation_id and tag_hour_on.k = 'hour_on'
+left join relation_tags tag_hour_off on relation_type.relation_id = tag_hour_off.relation_id and tag_hour_off.k = 'hour_off'
+left join relation_tags tag_except on relation_type.relation_id = tag_except.relation_id and tag_except.k = 'except'
+--join extra_config_boundaries on ST_Covers(extra_config_boundaries.geom, coalesce(via_way_node.geom, via_node.geom))
+join extra_all_boundaries boundaries on ST_Covers(boundaries.boundary, coalesce(via_way_node.geom, via_node.geom)) 
+join extra_config_boundaries cfg_boundaries on boundaries.relation_id = cfg_boundaries.relation_id 
+join extra_config_graph graph on 1=1
+where relation_type.k = 'type' and relation_type.v = 'restriction';
+*/
+
+create table turn_restrictions as
+select graph.graph_uri, 
+'OS' || lpad(from_way.member_id::text,11,'0') || 'RE/' || (case when from_way_element.sequence_id = 0 or coalesce(from_oneway.v ,'--') = '-1' then from_way_element.sequence_id else from_way_element.sequence_id-1 end) from_uri,
+'OS' || lpad(to_way.member_id::text,11,'0') || 'RE/' || (case when to_way_next_element.node_id is null then to_way_element.sequence_id - 1 when coalesce(to_oneway.v,'--') = '-1' and to_way_element.sequence_id > 0 then to_way_element.sequence_id - 1 else to_way_element.sequence_id end) to_uri,
+'OS' || lpad(via.member_id::text,11,'0') || 'NO' node_uri,
+restriction_tag.v restriction,
+tag_day_on.v day_on,
+tag_day_off.v day_off,
+tag_hour_on.v hour_on,
+tag_hour_off.v hour_off,
+tag_except.v exceptions 
+from relation_tags relation_type
+join relation_members from_way on relation_type.relation_id = from_way.relation_id and from_way.member_type = 'W' and from_way.member_role = 'from'
+join relation_members to_way on relation_type.relation_id = to_way.relation_id and to_way.member_type = 'W' and to_way.member_role = 'to'
+join relation_members via on relation_type.relation_id = via.relation_id and via.member_role = 'via' and via.member_type = 'N'
+join nodes via_node on via.member_id = via_node.id
+join relation_tags restriction_tag on relation_type.relation_id = restriction_tag.relation_id and restriction_tag.k = 'restriction'
+join way_nodes from_way_element on from_way.member_id = from_way_element.way_id and via.member_id = from_way_element.node_id
+join way_nodes to_way_element on to_way.member_id = to_way_element.way_id and via.member_id = to_way_element.node_id
+left join way_nodes to_way_next_element on to_way.member_id = to_way_next_element.way_id and to_way_next_element.sequence_id = to_way_element.sequence_id+1
+left join relation_tags tag_day_on on relation_type.relation_id = tag_day_on.relation_id and tag_day_on.k = 'day_on'
+left join relation_tags tag_day_off on relation_type.relation_id = tag_day_off.relation_id and tag_day_off.k = 'day_off'
+left join relation_tags tag_hour_on on relation_type.relation_id = tag_hour_on.relation_id and tag_hour_on.k = 'hour_on'
+left join relation_tags tag_hour_off on relation_type.relation_id = tag_hour_off.relation_id and tag_hour_off.k = 'hour_off'
+left join relation_tags tag_except on relation_type.relation_id = tag_except.relation_id and tag_except.k = 'except'
+left join way_tags from_oneway on from_way.member_id = from_oneway.way_id and from_oneway.k = 'oneway'
+left join way_tags to_oneway on to_way.member_id = to_oneway.way_id and to_oneway.k = 'oneway'
+join extra_all_boundaries boundaries on ST_Covers(boundaries.boundary, via_node.geom) 
+join extra_config_boundaries cfg_boundaries on boundaries.relation_id = cfg_boundaries.relation_id 
+join extra_config_graph graph on 1=1
+where relation_type.k = 'type' and relation_type.v = 'restriction';

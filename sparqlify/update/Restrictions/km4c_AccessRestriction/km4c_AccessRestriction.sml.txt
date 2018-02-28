@@ -1,0 +1,133 @@
+/* OSM2KM4C
+   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
+
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU Affero General Public License as
+   published by the Free Software Foundation, either version 3 of the
+   License, or (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU Affero General Public License for more details.
+
+   You should have received a copy of the GNU Affero General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
+
+Prefix km4c:<http://www.disit.org/km4city/schema#>
+Prefix dct:<http://purl.org/dc/terms/>
+Prefix foaf:<http://xmlns.com/foaf/0.1/>
+Prefix geo:<http://www.w3.org/2003/01/geo/wgs84_pos#>
+Prefix fn:<http://aksw.org/sparqlify/>
+Prefix rdf:<http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+Prefix rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+
+/*****************************
+*** Access Restrictions ******
+*****************************/
+
+Create View AccessRestrictions As
+
+Construct {
+Graph ?graph_uri {
+	?s a km4c:AccessRestriction;
+	   a km4c:Restriction;
+           km4c:where ?where;
+	   km4c:access ?access .
+	km4c:AccessRestriction rdfs:subClassOf km4c:Restriction 
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?p_where, "/restriction/access/", fn:urlEncode(?s_who), "/", fn:urlEncode(?s_direction), "/", fn:urlEncode(?s_condition)))
+?where = uri(concat("http://www.disit.org/km4city/resource/", ?p_where))
+?access = plainLiteral(?p_access)
+
+From [[
+select *, coalesce(p_who,'everybody') s_who, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from node_access
+union
+select *, coalesce(p_who,'everybody') s_who, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from way_access
+union
+select *, coalesce(p_who,'everybody') s_who, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from relation_access
+union
+select *, coalesce(p_who,'everybody') s_who, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from node_oneway
+union
+select *, coalesce(p_who,'everybody') s_who, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from way_oneway
+union
+select *, coalesce(p_who,'everybody') s_who, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from relation_oneway
+]]
+
+Create View AccessRestrictionsWho As
+
+Construct {
+Graph ?graph_uri {
+	?s km4c:who ?who
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?p_where, "/restriction/access/", fn:urlEncode(?p_who), "/", fn:urlEncode(?s_direction), "/", fn:urlEncode(?s_condition)))
+?who = plainLiteral(?p_who)
+From [[
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from node_access where p_who is not null
+union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from way_access where p_who is not null
+union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from relation_access where p_who is not null
+union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from node_oneway where p_who is not null
+union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from way_oneway where p_who is not null
+union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from relation_oneway where p_who is not null
+]]
+
+Create View AccessRestrictionsDirection As
+
+Construct {
+Graph ?graph_uri {
+	?s km4c:direction ?direction
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?p_where, "/restriction/access/", fn:urlEncode(?s_who), "/", fn:urlEncode(?p_direction), "/", fn:urlEncode(?s_condition)))
+?direction = plainLiteral(?p_direction)
+From [[
+select *, coalesce(p_who, 'everybody') s_who, coalesce(p_condition, 'unconditioned') s_condition from node_access where p_direction is not null
+union
+select *, coalesce(p_who, 'everybody') s_who, coalesce(p_condition, 'unconditioned') s_condition from way_access where p_direction is not null
+union
+select *, coalesce(p_who, 'everybody') s_who, coalesce(p_condition, 'unconditioned') s_condition from relation_access where p_direction is not null
+union
+select *, coalesce(p_who, 'everybody') s_who, coalesce(p_condition, 'unconditioned') s_condition from node_oneway where p_direction is not null
+union
+select *, coalesce(p_who, 'everybody') s_who, coalesce(p_condition, 'unconditioned') s_condition from way_oneway where p_direction is not null
+union
+select *, coalesce(p_who, 'everybody') s_who, coalesce(p_condition, 'unconditioned') s_condition from relation_oneway where p_direction is not null
+]]
+
+Create View AccessRestrictionsCondition As
+
+Construct {
+Graph ?graph_uri {
+	?s km4c:condition ?condition
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?p_where, "/restriction/access/", fn:urlEncode(?s_who), "/", fn:urlEncode(?s_direction), "/", fn:urlEncode(?p_condition)))
+?condition = plainLiteral(?p_condition)
+From [[
+select *, coalesce(p_who, 'everybody') s_who, coalesce(p_direction, 'alldirections') s_direction from node_access where p_condition is not null
+union
+select *, coalesce(p_who, 'everybody') s_who, coalesce(p_direction, 'alldirections') s_direction from way_access where p_condition is not null
+union
+select *, coalesce(p_who, 'everybody') s_who, coalesce(p_direction, 'alldirections') s_direction from relation_access where p_condition is not null
+union
+select *, coalesce(p_who, 'everybody') s_who, coalesce(p_direction, 'alldirections') s_direction from node_oneway where p_condition is not null
+union
+select *, coalesce(p_who, 'everybody') s_who, coalesce(p_direction, 'alldirections') s_direction from way_oneway where p_condition is not null
+union
+select *, coalesce(p_who, 'everybody') s_who, coalesce(p_direction, 'alldirections') s_direction from relation_oneway where p_condition is not null
+]]

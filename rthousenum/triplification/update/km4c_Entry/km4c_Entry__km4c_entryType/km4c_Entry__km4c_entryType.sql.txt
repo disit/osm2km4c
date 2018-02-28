@@ -1,0 +1,590 @@
+/* OSM2KM4C
+   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
+
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU Affero General Public License as
+   published by the Free Software Foundation, either version 3 of the
+   License, or (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU Affero General Public License for more details.
+
+   You should have received a copy of the GNU Affero General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
+   
+-- CONFIGURAZIONE 
+-- Ricontrollare sempre, ed eventualmente modificare, l'ID (o gli ID) delle Relation che servono da delimitazione territoriale.
+-- Se in output da Sparqlify, si richiede la generazione di quadruple (quindi con il grafo esplicitato), controllare e se del caso modificare anche quello.
+
+drop table if exists extra_config_boundaries; 
+
+create table extra_config_boundaries as
+select relation_id, ST_GeogFromText(ST_AsText(ST_Polygonize(linestring))) geom from ( 
+	select relation_members.relation_id, ST_GeomFromWKB(ST_AsBinary(ways.linestring)) linestring 
+	from relation_members join ways on ways.id = relation_members.member_id and relation_members.member_type='W' 
+	where relation_members.relation_id in (276369) --> TAGLIO SU ENTE TERRITORIALE DI INTERESSE, POSSO INSERIRE ANCHE UNA LISTA SEPARATA DA VIRGOLE
+	order by relation_members.relation_id, relation_members.sequence_id
+) boundaries 
+group by relation_id;
+
+drop table if exists extra_config_graph ;
+
+create table extra_config_graph (
+id serial primary key,
+graph_uri varchar(255)
+);
+
+-- INDICAZIONE DEL GRAFO IN CUI INSERIRE LE TRIPLE GENERATE. E' DEL TUTTO IRRILEVANTE SE IN OUTPUT DA SPARQLIFY MI FACCIO DARE TRIPLE INVECE CHE QUADRUPLE
+insert into extra_config_graph(graph_uri) values ('http://www.disit.org/km4city/graph/OSM/CA'); 
+
+-- Utilizzo dei numeri civici della Regione Toscana piuttosto che nativi di OSM
+
+drop table if exists extra_config_civic_num ;
+
+create table extra_config_civic_num (
+id serial primary key,
+civic_num_source varchar(255)
+);
+
+-- insert into extra_config_civic_num(civic_num_source) values ('Regione Toscana'); -- decommentare questa riga per utilizzare i numeri civici della Regione Toscana
+insert into extra_config_civic_num(civic_num_source) values ('Open Street Map'); -- decommentare questa riga per utilizzare i numeri civici nativi di Open Street Map
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+drop table if exists extra_ways;
+
+create table extra_ways as
+select prev_waynode.way_id global_id, prev_waynode.sequence_id local_id, prev_node.geom start_node, next_node.geom end_node, prev_node.id prev_node_id, next_node.id next_node_id
+from way_nodes prev_waynode 
+join nodes prev_node on prev_waynode.node_id = prev_node.id
+join way_nodes next_waynode on prev_waynode.way_id = next_waynode.way_id and prev_waynode.sequence_id = next_waynode.sequence_id-1
+join nodes next_node on next_waynode.node_id = next_node.id;
+
+create index on extra_ways (global_id);
+
+drop table if exists comuni_centroid_geom;
+
+create table comuni_centroid_geom as
+select com.relation_id, com.geom from (
+select relation_id, ST_GeogFromText(ST_AsText(ST_Centroid(ST_Polygonize(linestring)))) geom, ST_GeogFromText(ST_AsText(ST_Polygonize(linestring))) boundary from ( select relation_members.relation_id, ST_GeomFromWKB(ST_AsBinary(ways.linestring)) linestring from relation_members join ways on ways.id = relation_members.member_id and relation_members.member_type='W' 
+join relation_tags tag_type on relation_members.relation_id = tag_type.relation_id and tag_type.k = 'type' and tag_type.v = 'boundary'
+join relation_tags boundary on relation_members.relation_id = boundary.relation_id and boundary.k = 'boundary' and boundary.v = 'administrative'
+join relation_tags admin_level on relation_members.relation_id = admin_level.relation_id and admin_level.k = 'admin_level' and admin_level.v = '8' 
+join relation_tags catasto on relation_members.relation_id = catasto.relation_id and catasto.k = 'ref:catasto' -- taglio sugli italiani
+order by relation_members.relation_id, relation_members.sequence_id
+ ) com 
+group by relation_id
+) com join extra_config_boundaries boundaries on ST_Covers(boundaries.geom, com.geom) or boundaries.geom = com.boundary;
+
+drop table if exists comuni_border_geom ;
+
+create table comuni_border_geom as
+select com_border.* from 
+(
+select relation_id, 
+ST_GeogFromText(ST_AsText(ST_Polygonize(linestring))) geom
+from 
+( 
+select relation_members.relation_id, ST_GeomFromWKB(ST_AsBinary(ways.linestring)) linestring 
+from relation_members join ways on ways.id = relation_members.member_id and relation_members.member_type='W' 
+join relation_tags tag_type on relation_members.relation_id = tag_type.relation_id and tag_type.k = 'type' and tag_type.v = 'boundary'
+join relation_tags boundary on relation_members.relation_id = boundary.relation_id and boundary.k = 'boundary' and boundary.v = 'administrative'
+join relation_tags admin_level on relation_members.relation_id = admin_level.relation_id and admin_level.k = 'admin_level' and admin_level.v = '8' 
+join relation_tags catasto on relation_members.relation_id = catasto.relation_id and catasto.k = 'ref:catasto' -- taglio sugli italiani
+order by relation_members.relation_id, relation_members.sequence_id
+) com_border 
+group by relation_id
+) com_border
+join comuni_centroid_geom com_centroid on com_border.relation_id = com_centroid.relation_id;
+
+drop table if exists suburbs_centroid_geom ;
+
+create table suburbs_centroid_geom as
+select suburb.id, suburb.geom, suburb.suburb_type, suburb.suburb_name, comuni_border_geom.relation_id municipality_id
+from 
+(
+-- suburb ways
+select ways.id, ST_GeogFromText(ST_AsText(ST_Centroid(ST_GeomFromWKB(ST_AsBinary(ways.linestring))))) geom, 'W'::text suburb_type, way_suburb_name.v suburb_name from ways 
+join way_tags boundary on ways.id = boundary.way_id and boundary.k = 'boundary' and boundary.v = 'administrative'
+join way_tags admin_level on ways.id = admin_level.way_id and admin_level.k = 'admin_level' and cast(admin_level.v as int) > 8 
+join way_tags way_suburb_name on ways.id = way_suburb_name.way_id and way_suburb_name.k = 'name'
+union
+-- suburb relations
+select rsuburbs.*, rel_suburb_name.v suburb_name from 
+(
+select relation_id id, ST_GeogFromText(ST_AsText(ST_Centroid(ST_Polygonize(linestring)))) geom, 'R'::text suburb_type from ( select relation_members.relation_id, ST_GeomFromWKB(ST_AsBinary(ways.linestring)) linestring from relation_members join ways on ways.id = relation_members.member_id and relation_members.member_type='W' 
+join relation_tags tag_type on relation_members.relation_id = tag_type.relation_id and tag_type.k = 'type' and tag_type.v = 'boundary'
+join relation_tags boundary on relation_members.relation_id = boundary.relation_id and boundary.k = 'boundary' and boundary.v = 'administrative'
+join relation_tags admin_level on relation_members.relation_id = admin_level.relation_id and admin_level.k = 'admin_level' and cast(admin_level.v as int) > 8 
+order by relation_members.relation_id, relation_members.sequence_id
+ ) sub group by relation_id
+) rsuburbs 
+join relation_tags rel_suburb_name on rsuburbs.id = rel_suburb_name.relation_id and rel_suburb_name.k = 'name'
+union
+-- suburb nodes
+select id, ST_GeogFromWKB(ST_AsBinary(geom)), 'N'::text suburb_type, nd_suburb_name.v suburb_name from nodes join node_tags on nodes.id = node_tags.node_id and node_tags.k = 'place' and node_tags.v = 'suburb' join node_tags nd_suburb_name on nodes.id = nd_suburb_name.node_id and nd_suburb_name.k = 'name'
+) suburb
+join comuni_border_geom on ST_Covers(comuni_border_geom.geom, suburb.geom)
+;
+
+drop table if exists suburbs_border_geom ;
+
+create table suburbs_border_geom as
+select suburb.id, suburb.geom from 
+(
+-- suburb ways
+select ways.id, ST_GeogFromText(ST_AsText(ST_Polygonize(ST_GeomFromWKB(ST_AsBinary(ways.linestring))))) geom from ways 
+join way_tags boundary on ways.id = boundary.way_id and boundary.k = 'boundary' and boundary.v = 'administrative'
+join way_tags admin_level on ways.id = admin_level.way_id and admin_level.k = 'admin_level' and cast(admin_level.v as int) > 8 
+group by ways.id
+union
+-- suburb relations
+select relation_id id, ST_GeogFromText(ST_AsText(ST_Polygonize(linestring))) geom from ( select relation_members.relation_id, ST_GeomFromWKB(ST_AsBinary(ways.linestring)) linestring from relation_members join ways on ways.id = relation_members.member_id and relation_members.member_type='W' 
+join relation_tags tag_type on relation_members.relation_id = tag_type.relation_id and tag_type.k = 'type' and tag_type.v = 'boundary'
+join relation_tags boundary on relation_members.relation_id = boundary.relation_id and boundary.k = 'boundary' and boundary.v = 'administrative'
+join relation_tags admin_level on relation_members.relation_id = admin_level.relation_id and admin_level.k = 'admin_level' and cast(admin_level.v as int) > 8 
+order by relation_members.relation_id, relation_members.sequence_id
+ ) sub group by relation_id
+) suburb
+join suburbs_centroid_geom on suburb.id = suburbs_centroid_geom.id
+;
+
+drop table if exists extra_toponym_city ;
+
+create table extra_toponym_city (
+	id serial primary key,
+	global_way_id bigint,
+	local_way_id int,
+	city varchar(255), 		
+	suburb varchar(255)		
+);
+
+insert into extra_toponym_city(global_way_id, local_way_id, city) 
+select highways.global_id global_way_id,
+highways.local_id local_way_id,
+nome_comune.v city 
+from 
+(
+-- ways in relation roads
+select extra_ways.global_id, extra_ways.local_id, 
+ST_GeogFromText(ST_AsText(ST_GeomFromWKB(ST_AsBinary(extra_ways.start_node)))) start_pt,
+ST_GeogFromText(ST_AsText(ST_GeomFromWKB(ST_AsBinary(extra_ways.end_node)))) end_pt
+from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+  join extra_ways on rwt.way_id = extra_ways.global_id 
+ where COALESCE(r_route.v,'road') = 'road'
+   and COALESCE(r_network.v, '--') <> 'e-road' 
+   and rwt.v <> 'proposed'
+union
+-- ways in relation pedestrian multipolygon 
+select extra_ways.global_id, extra_ways.local_id, 
+ST_GeogFromText(ST_AsText(ST_GeomFromWKB(ST_AsBinary(extra_ways.start_node)))) start_pt,
+ST_GeogFromText(ST_AsText(ST_GeomFromWKB(ST_AsBinary(extra_ways.end_node)))) end_pt
+from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'multipolygon'
+  join relation_tags r_pedestrian on r.id = r_pedestrian.relation_id and r_pedestrian.k = 'highway' and r_pedestrian.v = 'pedestrian'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join extra_ways on r_ways.member_id = extra_ways.global_id 
+union
+-- ways that are roads
+select extra_ways.global_id, extra_ways.local_id, 
+ST_GeogFromText(ST_AsText(ST_GeomFromWKB(ST_AsBinary(extra_ways.start_node)))) start_pt,
+ST_GeogFromText(ST_AsText(ST_GeomFromWKB(ST_AsBinary(extra_ways.end_node)))) end_pt
+from way_tags wt
+join extra_ways on wt.way_id = extra_ways.global_id
+  left join relation_members rm on rm.member_type = 'W' and rm.member_id = wt.way_id and rm.relation_id in 
+(
+select r.id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+ where COALESCE(r_route.v,'road') = 'road'
+   and COALESCE(r_network.v, '--') <> 'e-road' 
+   and rwt.v <> 'proposed'  
+)
+ where wt.k = 'highway' 
+   and wt.v <> 'proposed'
+   and rm.member_id is null
+) highways
+join comuni_border_geom comuni on ST_Covers(comuni.geom, highways.start_pt) or ST_Covers(comuni.geom, highways.end_pt)
+join relation_tags nome_comune on comuni.relation_id = nome_comune.relation_id and nome_comune.k = 'name';
+
+update extra_toponym_city 
+set suburb = suburb.suburb_name
+from (
+
+select i_suburb.global_way_id, i_suburb.local_way_id, suburb_name from (
+select highways.global_way_id, highways.local_way_id,
+coalesce(way_suburb_name.v, rel_suburb_name.v) suburb_name,
+dense_rank() over (partition by highways.global_way_id, highways.local_way_id, coalesce(way_suburb_name.v, rel_suburb_name.v) order by cast(coalesce(way_suburb_level.v, rel_suburb_level.v) as int) desc) suburb_rank
+from
+(
+-- ways in relation roads
+select extra_ways.global_id global_way_id, extra_ways.local_id local_way_id, 
+ST_GeogFromText(ST_AsText(ST_GeomFromWKB(ST_AsBinary(extra_ways.start_node)))) start_pt,
+ST_GeogFromText(ST_AsText(ST_GeomFromWKB(ST_AsBinary(extra_ways.end_node)))) end_pt
+from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+  join extra_ways on rwt.way_id = extra_ways.global_id 
+ where COALESCE(r_route.v,'road') = 'road'
+   and COALESCE(r_network.v, '--') <> 'e-road' 
+   and rwt.v <> 'proposed'
+union
+-- ways in relation pedestrian multipolygon 
+select extra_ways.global_id, extra_ways.local_id, 
+ST_GeogFromText(ST_AsText(ST_GeomFromWKB(ST_AsBinary(extra_ways.start_node)))) start_pt,
+ST_GeogFromText(ST_AsText(ST_GeomFromWKB(ST_AsBinary(extra_ways.end_node)))) end_pt
+from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'multipolygon'
+  join relation_tags r_pedestrian on r.id = r_pedestrian.relation_id and r_pedestrian.k = 'highway' and r_pedestrian.v = 'pedestrian'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join extra_ways on r_ways.member_id = extra_ways.global_id 
+union
+-- ways that are roads
+select extra_ways.global_id global_way_id, extra_ways.local_id local_way_id, 
+ST_GeogFromText(ST_AsText(ST_GeomFromWKB(ST_AsBinary(extra_ways.start_node)))) start_pt,
+ST_GeogFromText(ST_AsText(ST_GeomFromWKB(ST_AsBinary(extra_ways.end_node)))) end_pt
+from way_tags wt
+join extra_ways on wt.way_id = extra_ways.global_id
+  left join relation_members rm on rm.member_type = 'W' and rm.member_id = wt.way_id and rm.relation_id in 
+(
+select r.id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+ where COALESCE(r_route.v,'road') = 'road'
+   and COALESCE(r_network.v, '--') <> 'e-road' 
+   and rwt.v <> 'proposed'  
+)
+ where wt.k = 'highway' 
+   and wt.v <> 'proposed'
+   and rm.member_id is null
+) highways
+join suburbs_border_geom st_end_suburb on ST_Covers(st_end_suburb.geom, highways.start_pt) and ST_Covers(st_end_suburb.geom, highways.end_pt)
+left join way_tags way_suburb_name on st_end_suburb.id = way_suburb_name.way_id and way_suburb_name.k = 'name'
+left join relation_tags rel_suburb_name on st_end_suburb.id = rel_suburb_name.relation_id and rel_suburb_name.k = 'name'
+left join way_tags way_suburb_level on st_end_suburb.id = way_suburb_level.way_id and way_suburb_level.k = 'admin_level'
+left join relation_tags rel_suburb_level on st_end_suburb.id = rel_suburb_level.relation_id and rel_suburb_level.k = 'admin_level'
+
+) i_suburb where suburb_rank = 1
+
+) suburb 
+where extra_toponym_city.global_way_id = suburb.global_way_id and extra_toponym_city.local_way_id = suburb.local_way_id;
+
+drop table if exists extra_tmp_1 ;
+
+create table extra_tmp_1 as
+    select distinct 'OS' || lpad(r.id::text,11,'0') || 'LR' road_id,
+    'OS' || lpad(m.id::text,11,'0') || 'CO' municipality_id, 
+    r_name.v road_extend_name,
+    r_ways_routes.global_way_id a_global_way_id,
+    r_ways_routes.local_way_id a_local_way_id,
+    r_ways_routes.linestring a_way_route, 
+    r_ways_routes.prev_node_id a_start_node_id, 
+    r_ways_routes.next_node_id a_end_node_id
+    from relations r
+    join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+    left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+    left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+    join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+    join ( select global_id global_way_id, local_id local_way_id, ST_MakeLine(start_node,end_node) linestring, prev_node_id, next_node_id from extra_ways ) r_ways_routes on r_ways.member_id = r_ways_routes.global_way_id
+    join extra_toponym_city e on r_ways_routes.global_way_id = e.global_way_id and r_ways_routes.local_way_id = e.local_way_id
+    join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+    join relation_tags r_name on r.id = r_name.relation_id and r_name.k = 'name'
+    join relation_tags m_name on m_name.k = 'name' and m_name.v = e.city
+    join relations m on m_name.relation_id = m.id
+    join relation_tags m_type on m.id = m_type.relation_id and m_type.k = 'type' and m_type.v = 'boundary'
+    join relation_tags m_boundary on m.id = m_boundary.relation_id and m_boundary.k = 'boundary' and m_boundary.v = 'administrative'
+    join relation_tags m_admin_level on m.id = m_admin_level.relation_id and m_admin_level.k = 'admin_level' and m_admin_level.v = '8'
+    where COALESCE(r_route.v,'road') = 'road'
+    and COALESCE(r_network.v, '--') <> 'e-road' 
+    and rwt.v <> 'proposed'
+union -- pedestrian (squares)
+    select distinct 'OS' || lpad(r.id::text,11,'0') || 'SQ' road_id,
+    'OS' || lpad(m.id::text,11,'0') || 'CO' municipality_id, 
+    r_name.v road_extend_name,
+    r_ways_routes.global_way_id a_global_way_id,
+    r_ways_routes.local_way_id a_local_way_id,
+    r_ways_routes.linestring a_way_route,
+    r_ways_routes.prev_node_id a_start_node_id,
+    r_ways_routes.next_node_id a_end_node_id
+    from relations r
+    join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'multipolygon'
+    join relation_tags r_pedestrian on r.id = r_pedestrian.relation_id and r_pedestrian.k = 'highway' and r_pedestrian.v = 'pedestrian'
+    join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+    join ( select global_id global_way_id, local_id local_way_id, ST_MakeLine(start_node,end_node) linestring, prev_node_id, next_node_id from extra_ways ) r_ways_routes on r_ways.member_id = r_ways_routes.global_way_id
+    join extra_toponym_city e on r_ways_routes.global_way_id = e.global_way_id and r_ways_routes.local_way_id = e.local_way_id
+    join relation_tags r_name on r.id = r_name.relation_id and r_name.k = 'name'
+    join relation_tags m_name on m_name.k = 'name' and m_name.v = e.city
+    join relations m on m_name.relation_id = m.id
+    join relation_tags m_type on m.id = m_type.relation_id and m_type.k = 'type' and m_type.v = 'boundary'
+    join relation_tags m_boundary on m.id = m_boundary.relation_id and m_boundary.k = 'boundary' and m_boundary.v = 'administrative'
+    join relation_tags m_admin_level on m.id = m_admin_level.relation_id and m_admin_level.k = 'admin_level' and m_admin_level.v = '8'
+
+;
+
+drop table if exists extra_tmp_2 ;
+
+create table extra_tmp_2 as 
+    select distinct 'OS' || lpad(wt.way_id::text,11,'0') || 'SR' road_id,  
+    'OS' || lpad(m.id::text,11,'0') || 'CO' municipality_id,
+    way_name.v road_extend_name,
+    extra_ways.global_way_id a_global_way_id,
+    extra_ways.local_way_id a_local_way_id,
+    extra_ways.linestring a_way_route,
+    extra_ways.prev_node_id a_start_node_id,
+    extra_ways.next_node_id a_end_node_id
+    from ways 
+    join way_tags wt on ways.id = wt.way_id
+    join extra_toponym_city e on wt.way_id = e.global_way_id 
+    join ( select global_id global_way_id, local_id local_way_id, ST_MakeLine(start_node,end_node) linestring, prev_node_id, next_node_id from extra_ways ) extra_ways on e.global_way_id = extra_ways.global_way_id and e.local_way_id = extra_ways.local_way_id
+    join way_tags way_name on wt.way_id = way_name.way_id and way_name.k='name'
+    join relation_tags m_name on m_name.k = 'name' and m_name.v = e.city
+    join relations m on m_name.relation_id = m.id
+    join relation_tags m_type on m.id = m_type.relation_id and m_type.k = 'type' and m_type.v = 'boundary'
+    join relation_tags m_boundary on m.id = m_boundary.relation_id and m_boundary.k = 'boundary' and m_boundary.v = 'administrative'
+    join relation_tags m_admin_level on m.id = m_admin_level.relation_id and m_admin_level.k = 'admin_level' and m_admin_level.v = '8'
+    where wt.k = 'highway' 
+    and wt.v <> 'proposed';
+
+drop table if exists extra_streetnumbers_on_nodes ;
+
+create table extra_streetnumbers_on_nodes as
+select * from (
+select distinct 'OS' || lpad(nodes.id::text,11,'0') || 'NN' cn_id, 
+       housenumber.v extend_number,
+       substring(housenumber.v FROM '[0-9]+') number,
+       substring(housenumber.v FROM '[a-zA-Z]+') exponent,
+	COALESCE(long_roads.road_id,short_roads.road_id) road_id,
+CASE 
+WHEN city.v = any ('{Firenze,Genova,Savona}') and housenumber.v ilike '%r%' THEN 'Rosso'
+WHEN city.v = any ('{Firenze,Genova,Savona}') and not housenumber.v ilike '%r%' THEN 'Nero'
+ELSE 'Privo colore'
+END as class_code,
+'OS' || lpad(nodes.id::text,11,'0') || 'NE' en_id,  
+'Accesso esterno diretto' entry_type,
+ST_X(nodes.geom) long,
+ST_Y(nodes.geom) lat,
+CASE WHEN motorcycle.node_id is not null or motorcar.node_id is not null THEN 'Accesso carrabile' ELSE 'Accesso non carrabile' END as porte_cochere, 
+CASE WHEN long_roads.road_id is null THEN 'OS' || lpad(short_roads.a_global_way_id::text,11,'0') || 'RE/' || short_roads.a_local_way_id ELSE 'OS' || lpad(long_roads.a_global_way_id::text,11,'0') || 'RE/' || long_roads.a_local_way_id END as re_id,
+dense_rank() over (partition by nodes.id order by ST_Distance(nodes.geom, COALESCE(long_roads.a_way_route,nodes.geom))) as long_roads_way_rank,
+dense_rank() over (partition by nodes.id order by ST_Distance(nodes.geom, COALESCE(short_roads.a_way_route,nodes.geom))) as short_roads_way_rank,
+coalesce(source_rt.v,'Open Street Map') node_source,
+coalesce(ref_tag.v,'--') native_node_ref
+from nodes
+join node_tags housenumber on nodes.id = housenumber.node_id and housenumber.k = 'addr:housenumber'
+join node_tags street on nodes.id = street.node_id and street.k = 'addr:street'
+join node_tags city on nodes.id = city.node_id and city.k = 'addr:city'
+left join node_tags motorcycle on nodes.id = motorcycle.node_id and motorcycle.k = 'motorcycle' and motorcycle.v = 'yes'
+left join node_tags motorcar on nodes.id = motorcar.node_id and motorcar.k = 'motorcar' and motorcar.v = 'yes'
+left join node_tags source_rt on nodes.id = source_rt.node_id and source_rt.k='source' and source_rt.v='Regione Toscana'
+left join node_tags ref_tag on nodes.id = ref_tag.node_id and ref_tag.k='ref' and coalesce(source_rt.v,'--') = 'Regione Toscana'
+join 
+(
+select 'OS' || lpad(comuni_border_geom.relation_id::text,11,'0') || 'CO' id, relation_tags.v m_name, comuni_border_geom.geom
+from comuni_border_geom
+join relation_tags on comuni_border_geom.relation_id = relation_tags.relation_id and relation_tags.k = 'name' 
+) municipalities on ST_Covers(municipalities.geom, nodes.geom)
+left join extra_tmp_1 long_roads on municipalities.id = long_roads.municipality_id and ( street.v = long_roads.road_extend_name or coalesce(cast(ref_tag.v as numeric),-1) = long_roads.a_start_node_id or coalesce(cast(ref_tag.v as numeric),-1) = long_roads.a_end_node_id )
+left join extra_tmp_2 short_roads on municipalities.id = short_roads.municipality_id and ( street.v = short_roads.road_extend_name or coalesce(cast(ref_tag.v as numeric),-1) = short_roads.a_start_node_id or coalesce(cast(ref_tag.v as numeric),-1) = short_roads.a_end_node_id )
+where COALESCE(long_roads.road_id,short_roads.road_id,'--') <> '--' 
+) q where long_roads_way_rank = 1 and short_roads_way_rank = 1;
+
+drop table if exists extra_streetnumbers_on_relations ;
+
+create table extra_streetnumbers_on_relations as 
+select * from (
+select distinct 'OS' || lpad(streetNumbers.member_id::text,11,'0') || 'NN' cn_id,
+       housenumber.v extend_number,
+       substring(housenumber.v FROM '[0-9]+') number,
+       substring(housenumber.v FROM '[a-zA-Z]+') exponent,
+COALESCE(super_road.road_id, pedestrian_super_road.road_id, 'OS' || lpad(road.member_id::text,11,'0') || 'SR') road_id,
+CASE 
+WHEN COALESCE(city.v,'--') = any ('{Firenze,Genova,Savona}') and housenumber.v ilike '%r%' THEN 'Rosso'
+WHEN COALESCE(city.v,'--') = any ('{Firenze,Genova,Savona}') and not housenumber.v ilike '%r%' THEN 'Nero'
+ELSE 'Privo colore'
+END as class_code,
+'OS' || lpad(streetNumberNodes.id::text,11,'0') || 'NE' en_id,  
+'Accesso esterno diretto' entry_type,
+ST_X(streetNumberNodes.geom) long,
+ST_Y(streetNumberNodes.geom) lat,
+CASE WHEN motorcycle.node_id is not null or motorcar.node_id is not null THEN 'Accesso carrabile' ELSE 'Accesso non carrabile' END as porte_cochere,
+'OS' || lpad(road.member_id::text,11,'0') || 'RE/' || extra_ways.local_id re_id,
+dense_rank() over (partition by streetNumbers.member_id, extra_ways.global_id order by ST_Distance(streetNumberNodes.geom, ST_MakeLine(extra_ways.start_node,extra_ways.end_node))) as road_element_rank
+from relations
+join relation_tags associatedStreet on relations.id = associatedStreet.relation_id and associatedStreet.k = 'type' and associatedStreet.v = 'associatedStreet'
+left join relation_tags city on relations.id = city.relation_id and city.k = 'addr:city'
+join relation_members streetNumbers on relations.id = streetNumbers.relation_id and streetNumbers.member_type = 'N'
+join nodes streetNumberNodes on streetNumbers.member_id = streetNumberNodes.id
+left join node_tags motorcycle on streetNumberNodes.id = motorcycle.node_id and motorcycle.k = 'motorcycle' and motorcycle.v = 'yes'
+left join node_tags motorcar on streetNumberNodes.id = motorcar.node_id and motorcar.k = 'motorcar' and motorcar.v = 'yes'
+join node_tags housenumber on housenumber.node_id = streetNumbers.member_id and housenumber.k = 'addr:housenumber'
+join relation_members road on relations.id = road.relation_id and road.member_type = 'W'
+join extra_ways on extra_ways.global_id = road.member_id
+join extra_toponym_city e on road.member_id = e.global_way_id and extra_ways.local_id = e.local_way_id
+left join 
+(
+select distinct r_ways.member_id way_id,
+       'OS' || lpad(r.id::text,11,'0') || 'LR' road_id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+ where COALESCE(r_route.v,'road') = 'road'
+   and COALESCE(r_network.v, '--') <> 'e-road' 
+   and rwt.v <> 'proposed'
+) super_road on road.member_id = super_road.way_id 
+left join
+(
+select distinct r_ways.member_id way_id,
+       'OS' || lpad(r.id::text,11,'0') || 'SQ' road_id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'multipolygon'
+  join relation_tags r_pedestrian on r.id = r_pedestrian.relation_id and r_pedestrian.k = 'highway' and r_pedestrian.v = 'pedestrian'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+) pedestrian_super_road on road.member_id = pedestrian_super_road.way_id 
+) q where road_element_rank = 1;
+
+drop table if exists extra_streetnumbers_on_junctions ;
+
+create table extra_streetnumbers_on_junctions as
+select distinct 'OS' || lpad(nodes.id::text,11,'0') || 'NN' cn_id,
+       housenumber.v extend_number,
+       substring(housenumber.v FROM '[0-9]+') number,
+       substring(housenumber.v FROM '[a-zA-Z]+') exponent,
+       COALESCE(super_road.road_id, pedestrian_super_road.road_id, simple_road.road_id) road_id,
+CASE 
+WHEN e.city = any ('{Firenze,Genova,Savona}') and housenumber.v ilike '%r%' THEN 'Rosso'
+WHEN e.city = any ('{Firenze,Genova,Savona}') and not housenumber.v ilike '%r%' THEN 'Nero'
+ELSE 'Privo colore'
+END as class_code,
+'OS' || lpad(nodes.id::text,11,'0') || 'NE' en_id,  
+'Accesso esterno diretto' entry_type,
+ST_X(nodes.geom) long,
+ST_Y(nodes.geom) lat,
+CASE WHEN motorcycle.node_id is not null or motorcar.node_id is not null THEN 'Accesso carrabile' ELSE 'Accesso non carrabile' END as porte_cochere,
+'OS' || lpad(extra_ways.global_id::text,11,'0') || 'RE/' || extra_ways.local_id re_id
+from nodes 
+join node_tags housenumber on nodes.id = housenumber.node_id and housenumber.k = 'addr:housenumber'
+left join node_tags motorcycle on nodes.id = motorcycle.node_id and motorcycle.k = 'motorcycle' and motorcycle.v = 'yes'
+left join node_tags motorcar on nodes.id = motorcar.node_id and motorcar.k = 'motorcar' and motorcar.v = 'yes'
+join way_nodes junctions on nodes.id = junctions.node_id
+join extra_ways on junctions.way_id = extra_ways.global_id and extra_ways.start_node = nodes.geom
+join extra_toponym_city e on e.global_way_id = extra_ways.global_id and e.local_way_id = extra_ways.local_id 
+left join 
+(
+select distinct r_ways.member_id way_id,
+       'OS' || lpad(r.id::text,11,'0') || 'LR' road_id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+ where COALESCE(r_route.v,'road') = 'road'
+   and COALESCE(r_network.v, '--') <> 'e-road' 
+   and rwt.v <> 'proposed'
+) super_road on junctions.way_id = super_road.way_id 
+left join 
+(
+  select distinct r_ways.member_id way_id,
+       'OS' || lpad(r.id::text,11,'0') || 'SQ' road_id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'multipolygon'
+  join relation_tags r_pedestrian on r.id = r_pedestrian.relation_id and r_pedestrian.k = 'highway' and r_pedestrian.v = 'pedestrian'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+) pedestrian_super_road on junctions.way_id = pedestrian_super_road.way_id 
+left join
+(
+select distinct 'OS' || lpad(wt.way_id::text,11,'0') || 'SR' road_id,
+wt.way_id osm_road_id
+  from way_tags wt
+  left join relation_members rm on rm.member_type = 'W' and rm.member_id = wt.way_id and rm.relation_id in 
+(
+select r.id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+ where COALESCE(r_route.v,'road') = 'road'
+   and COALESCE(r_network.v, '--') <> 'e-road' 
+   and rwt.v <> 'proposed'  
+)
+ where wt.k = 'highway' 
+   and wt.v <> 'proposed'
+   and rm.member_id is null
+
+) simple_road on junctions.way_id = simple_road.osm_road_id
+where COALESCE(super_road.road_id, pedestrian_super_road.road_id, simple_road.road_id, '--') <> '--';
+
+/****************************************
+*********** Istanziazione di ************
+*********** StreetNumber e Entry ********
+*********** legati con la Road **********
+*********** attraverso l'indirizzo ******
+*********** indicato sul nodo ***********
+****************************************/
+
+drop table if exists NodeStreetNumberRoad ;
+
+Create Table NodeStreetNumberRoad As
+select * from extra_streetnumbers_on_nodes
+  join extra_config_graph cfg on 1=1
+  join extra_config_civic_num on 1=1
+  where civic_num_source = node_source
+;
+
+/****************************************
+*********** Istanziazione di ************
+*********** StreetNumber e Entry ********
+*********** legati con la Road **********
+*********** attraverso le Relation ******
+*********** di tipo associateStreet *****
+****************************************/
+
+drop table if exists RelationStreetNumberRoad ;
+
+Create Table RelationStreetNumberRoad As
+select * from extra_streetnumbers_on_relations
+  join extra_config_graph cfg on 1=1
+  join extra_config_civic_num on 1=1
+  where civic_num_source = 'Open Street Map'
+;
+
+/****************************************
+*********** Istanziazione di ************
+*********** StreetNumber e Entry ********
+*********** legati con la Road **********
+*********** attraverso il fatto che il **
+*********** nodo è giunzione della Way **
+****************************************/
+
+drop table if exists NodeStreetNumberRoad2 ;
+
+Create Table NodeStreetNumberRoad2 As
+select * from extra_streetnumbers_on_junctions
+  join extra_config_graph cfg on 1=1
+  join extra_config_civic_num on 1=1
+  where civic_num_source = 'Open Street Map'
+;

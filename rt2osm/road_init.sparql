@@ -1,0 +1,59 @@
+# 	OSM2KM4C
+#   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU Affero General Public License as
+#   published by the Free Software Foundation, either version 3 of the
+#   License, or (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU Affero General Public License for more details.
+#
+#   You should have received a copy of the GNU Affero General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX units: <http://www.opengis.net/def/uom/OGC/1.0/>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX geo: <http://www.w3.org/2003/01/geo/wgs84_pos#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+
+construct {
+  ?r a km4c:Road ;
+  km4c:inMunicipalityOf ?s ;
+  km4c:containsElement ?e ;
+  km4c:extendName ?en ;
+  km4c:roadName ?rn ;
+  km4c:roadType ?rt .
+  ?s dct:alternative ?sa .
+  ?e a km4c:RoadElement ;  
+  km4c:startsAtNode ?esn ;
+  km4c:endsAtNode ?een .
+  ?esn a km4c:Node ;
+  geo:geometry ?esng .
+  ?een a km4c:Node ;
+  geo:geometry ?eeng .
+}
+where {
+  graph <urn:km4city:OSM:test:grosseto> { # OSM
+  # graph <http://www.disit.org/km4city/resource/GrafoStradale/Grafo_stradale_Grosseto> { # RT
+    ?s a km4c:Municipality ;
+    foaf:name "Seggiano" . # Taglio geografico
+    ?r a km4c:Road ;
+    km4c:inMunicipalityOf ?s ;
+    km4c:containsElement ?e ;
+    km4c:extendName ?en ;
+    km4c:roadName ?rn ;
+    km4c:roadType ?rt .
+    ?s dct:alternative ?sa .
+    ?e a km4c:RoadElement ;
+    km4c:startsAtNode ?esn ;
+    km4c:endsAtNode ?een .
+    ?esn a km4c:Node ;
+    geo:geometry ?esng .
+    ?een a km4c:Node ;
+    geo:geometry ?eeng .
+  }
+}

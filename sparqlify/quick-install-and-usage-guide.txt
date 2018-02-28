@@ -1,0 +1,119 @@
+OSM2KM4C
+Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+
+----------------------------------------------------
+- Open Street Map Triplification - The Km4City way -
+----------------------------------------------------
+
+Introduction
+------------
+
+This indications are for generating a set of RDF triples (or quads) that represent a street graph that include roads, road segments, street numbers, lanes, traffic restrictions, and other, gathering the data from an Open Street Map extract.
+
+Preliminary Notice
+------------------
+
+The following has been tested on Linux Ubuntu and Debian distros. 
+
+Slight modifications could be needed for that everything could work properly in other environments.
+
+What you need
+-------------
+
+1.	PostgreSQL, see also https://www.postgresql.org/
+2.	PostGIS extension for PostgreSQL, see also https://postgis.net/
+3.	Sparqlify, see also https://github.com/SmartDataAnalytics/Sparqlify
+4.	Osmosis, see also https://wiki.openstreetmap.org/wiki/Osmosis
+5. 	Km4City performance_optimization.sql script, that you can find in install and doc subfolders
+6.	Km4City install/irdbcmap.sql script, that you can find in install subfolder
+7.	Km4City install/irdbcmap.sml script, that you can find in install subfolder
+8.	Km4City Ontology, see also http://www.km4city.org/
+
+First Install Process
+---------------------
+
+Install the Open Street Map Osmosis tool following the indications that you can find at https://wiki.openstreetmap.org/wiki/Osmosis#How_to_install
+
+Install PostgreSQL with PostGIS following the indications that you can find at https://wiki.openstreetmap.org/wiki/Osmosis/PostGIS_Setup. 
+*Caution* We make use of the simple schema instead of the snapshot schema. SQL scripts for the simple schema can be found at the same locations where the scripts for the snapshot schema can be found, under the Osmosis root folder.
+
+Install the Sparqlify, through the following steps:
+
+1.	Make sure that you have Java 8 installed
+
+2.	Edit sparqlify-cli/src/main/java/org/aksw/sparqlify/web/Main.java, around line 200, adding the following:
+	
+	if(dbProductName.equals("PostgreSQL")) {
+		dbProductName = "Postgresql";
+	}
+
+	below the following:
+
+	DatabaseMetaData dbMeta = conn.getMetaData();
+	String dbProductName = dbMeta.getDatabaseProductName();
+
+3.	Perform the Assembly based build from code, described at https://github.com/SmartDataAnalytics/Sparqlify#assembly-based
+
+	The compile process *fails* but it is anyway ok for our purposes.
+
+4.	Create sparqlify.sh, as it is suggested at par. 1.1.1 "Building Sparqlify from Source", in:
+
+	https://github.com/downloads/SmartDataAnalytics/Sparqlify/Sparqlify-UserManual-And-TechnicalDocumentation.pdf
+
+	setting the classpath to:
+
+	sparqlify-cli/target/sparqlify-cli-0.8.2-jar-with-dependencies.jar
+
+Download the Open Street Map data extract of interest from http://download.geofabrik.de/ or similar.
+*Caution* While /updating/ an extract is trivial, /extending/ an extract through a joint with other extracts is not at all. So, get an extract that could be suitable for both your present and future needs.
+
+Load the Open Street Map data extract to the simple schema relational database. Osmosis is suitable for the task. Follow the indications at:
+https://wiki.openstreetmap.org/wiki/Osmosis/Detailed_Usage_0.45#PostGIS_Tasks_.28Simple_Schema.29
+
+Execute the performance_optimization.sql script on the simple schema relational database that you have just filled with Open Street Map data.
+
+Fully Operational Triplification
+--------------------------------
+
+Configure the triplification, editing the irdbcmap.sql script:
+
+1.	Replace the default 276369 with one or more OSM ID of OSM relations that outline the boundaries of the triplification. 
+	As an example, for triplifying the only Municipality of Florence, you would set 42602.
+
+2.	Possibly replace the default "http://www.disit.org/km4city/graph/OSM/CA" triple graph, with the URI of the graph where the triples will be put.
+	For that the setting could be leveraged, the Sparqlify must be instructed to produce N-Quads, instead of N-Triples (see below). 
+
+Execute the irdbcmap.sql script on the simple schema relational database that you have filled with Open Street Map data.
+
+Execute Sparqlify. Use the irdbcmap.sml script as is, for the -m argument. Use the PostgreSQL instance host, simple schema database name, username and password for the -h -d -U -W arguments. Use one of {ntriples, nquads} for the -o argument.
+*Caution* Move to the Sparqlify root folder, then launch the sparqlify.sh script that you have prepared at install time.
+*Sample* ./sparqlify.sh -m ~/triples/42472/install/20180102/script.sml -h 192.168.0.110 -d pgsimple_ita -U pgsimple_user -W pgsimple_password -o ntriples --dump > ~/triples/42472/install/20180102/dirty.n3
+
+Clean the Sparqlify output, stripping the two leading rows, and removing duplicates.
+
+Load the Sparqlify output, and the Km4City Ontology, to your graph database.
+
+Fully Operational /Single-Property/ Triplification (advanced)
+-------------------------------------------------------------
+
+The update subfolder has a subfolder for each concept, and each concept subfolder has a subfolder for each property, and each property subfolder contains irdbcmap.sql and irdbcmap.sml files that are specific for producing the triples for the specific property. The indications provided for the fully operational triplification apply.
+
+Contacts
+--------
+
+DISIT Lab, DINFO Dept., University of Florence.
+http://www.disit.org/
+

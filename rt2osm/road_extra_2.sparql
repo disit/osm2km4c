@@ -1,0 +1,107 @@
+# 	OSM2KM4C
+#   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU Affero General Public License as
+#   published by the Free Software Foundation, either version 3 of the
+#   License, or (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU Affero General Public License for more details.
+#
+#   You should have received a copy of the GNU Affero General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX units: <http://www.opengis.net/def/uom/OGC/1.0/>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX geo: <http://www.w3.org/2003/01/geo/wgs84_pos#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+
+construct 
+{
+  graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/Road/ComuneGrosseto> {
+    ?r2 owl:sameAs ?tr .
+    ?tr owl:sameAs ?r2 .
+  }
+}
+
+WHERE {
+
+  graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/RT_Graph/ComuneGrosseto> {
+
+    {
+      ?n a km4c:Node. 
+      ?e1 km4c:startsAtNode ?n.
+      ?e2 km4c:startsAtNode ?n.
+      ?r km4c:containsElement ?e1 .
+      ?r2 km4c:containsElement ?e2 .
+      ?r km4c:extendName ?en .
+      ?r2 km4c:extendName ?en2 .
+      ?r km4c:roadName ?rn .
+      ?r2 km4c:roadName ?rn2 .
+      filter ( ?r != ?r2 ) .
+    }
+    UNION
+    {
+      ?n a km4c:Node. 
+      ?e1 km4c:startsAtNode ?n.
+      ?e2 km4c:endsAtNode ?n.
+      ?r km4c:containsElement ?e1 .
+      ?r2 km4c:containsElement ?e2 .
+      ?r km4c:extendName ?en .
+      ?r2 km4c:extendName ?en2 .
+      ?r km4c:roadName ?rn .
+      ?r2 km4c:roadName ?rn2 .
+      filter ( ?r != ?r2 ) .
+    }
+    UNION
+    {
+      ?n a km4c:Node. 
+      ?e1 km4c:endsAtNode ?n.
+      ?e2 km4c:startsAtNode ?n.
+      ?r km4c:containsElement ?e1 .
+      ?r2 km4c:containsElement ?e2 .
+      ?r km4c:extendName ?en .
+      ?r2 km4c:extendName ?en2 .
+      ?r km4c:roadName ?rn .
+      ?r2 km4c:roadName ?rn2 .
+      filter ( ?r != ?r2 ) .
+    }
+    UNION
+    {
+      ?n a km4c:Node. 
+      ?e1 km4c:endsAtNode ?n.
+      ?e2 km4c:endsAtNode ?n.
+      ?r km4c:containsElement ?e1 .
+      ?r2 km4c:containsElement ?e2 .
+      ?r km4c:extendName ?en .
+      ?r2 km4c:extendName ?en2 .
+      ?r km4c:roadName ?rn .
+      ?r2 km4c:roadName ?rn2 .
+      filter ( ?r != ?r2 ) .
+    }
+  }
+
+   GRAPH <http://www.disit.org/km4city/resource/GrafoStradale/Grafo_stradale_Grosseto> {
+    ?r km4c:roadType ?rt .
+    ?r2 km4c:roadType ?rt2 .
+  }
+
+  graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/OSM_Graph/ComuneGrosseto> {
+    ?tr a km4c:Road;
+      km4c:extendName ?trn . 
+  }
+
+  graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/Road/ComuneGrosseto> {
+    ?r owl:sameAs ?tr .
+  }
+
+  filter not exists { graph <http://www.disit.org/km4city/resource/GrafoStradale/RT2OSM/Road/ComuneGrosseto> { ?r2 owl:sameAs ?something } }
+
+  filter( contains(?rt,?rt2) || contains(?rt2, ?rt) ) .
+  filter( contains(?rn, ?rn2) || contains (?rn2, ?rn) ) .
+
+}

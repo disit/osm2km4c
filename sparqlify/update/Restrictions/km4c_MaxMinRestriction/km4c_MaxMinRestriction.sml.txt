@@ -1,0 +1,160 @@
+/* OSM2KM4C
+   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
+
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU Affero General Public License as
+   published by the Free Software Foundation, either version 3 of the
+   License, or (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU Affero General Public License for more details.
+
+   You should have received a copy of the GNU Affero General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
+
+Prefix km4c:<http://www.disit.org/km4city/schema#>
+Prefix dct:<http://purl.org/dc/terms/>
+Prefix foaf:<http://xmlns.com/foaf/0.1/>
+Prefix geo:<http://www.w3.org/2003/01/geo/wgs84_pos#>
+Prefix fn:<http://aksw.org/sparqlify/>
+Prefix rdf:<http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+Prefix rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+
+/***************************
+*** MaxMinRestrictions *****
+***************************/
+
+Create View MaxMinRestrictions As
+
+Construct {
+Graph ?graph_uri {
+	?s a km4c:MaxMinRestriction;
+           a km4c:Restriction;
+	   km4c:where ?where;
+	   km4c:what ?what;
+	   km4c:limit ?limit .
+	km4c:MaxMinRestriction rdfs:subClassOf km4c:Restriction
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?p_where, "/restriction/maxmin/", fn:urlEncode(?p_what), "/" , fn:urlEncode(?s_direction), "/", fn:urlEncode(?s_condition))) 
+?where = uri(concat("http://www.disit.org/km4city/resource/", ?p_where))
+?what = plainLiteral(?p_what)
+?limit = plainLiteral(?p_limit)
+
+From [[
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from node_maxweight union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from node_maxaxleload union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from node_maxheight union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from node_maxwidth union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from node_maxlength union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from node_maxdraught union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from node_maxspeed union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from node_minspeed union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from node_maxstay union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from way_maxweight union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from way_maxaxleload union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from way_maxheight union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from way_maxwidth union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from way_maxlength union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from way_maxdraught union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from way_maxspeed union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from way_minspeed union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from way_maxstay union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from relation_maxweight union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from relation_maxaxleload union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from relation_maxheight union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from relation_maxwidth union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from relation_maxlength union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from relation_maxdraught union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from relation_maxspeed union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from relation_minspeed union
+select *, coalesce(p_direction, 'alldirections') s_direction, coalesce(p_condition, 'unconditioned') s_condition from relation_maxstay
+]]
+
+Create View MaxMinRestrictionsDirection As
+
+Construct {
+Graph ?graph_uri {
+	?s km4c:direction ?direction
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?p_where, "/restriction/maxmin/", fn:urlEncode(?p_what), "/" , fn:urlEncode(?p_direction), "/", fn:urlEncode(?s_condition))) 
+?direction = plainLiteral(?p_direction)
+
+From [[
+select *, coalesce(p_condition, 'unconditioned') s_condition from node_maxweight where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from node_maxaxleload where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from node_maxheight where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from node_maxwidth where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from node_maxlength where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from node_maxdraught where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from node_maxspeed where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from node_minspeed where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from node_maxstay where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from way_maxweight where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from way_maxaxleload where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from way_maxheight where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from way_maxwidth where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from way_maxlength where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from way_maxdraught where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from way_maxspeed where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from way_minspeed where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from way_maxstay where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from relation_maxweight where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from relation_maxaxleload where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from relation_maxheight where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from relation_maxwidth where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from relation_maxlength where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from relation_maxdraught where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from relation_maxspeed where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from relation_minspeed where p_direction is not null union
+select *, coalesce(p_condition, 'unconditioned') s_condition from relation_maxstay where p_direction is not null 
+]]
+
+Create View MaxMinRestrictionsCondition As
+
+Construct {
+Graph ?graph_uri {
+	?s km4c:condition ?condition
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?p_where, "/restriction/maxmin/", fn:urlEncode(?p_what), "/" , fn:urlEncode(?s_direction), "/", fn:urlEncode(?p_condition))) 
+?condition = plainLiteral(?p_condition)
+
+From [[
+select *, coalesce(p_direction, 'unconditioned') s_direction from node_maxweight where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from node_maxaxleload where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from node_maxheight where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from node_maxwidth where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from node_maxlength where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from node_maxdraught where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from node_maxspeed where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from node_minspeed where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from node_maxstay where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from way_maxweight where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from way_maxaxleload where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from way_maxheight where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from way_maxwidth where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from way_maxlength where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from way_maxdraught where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from way_maxspeed where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from way_minspeed where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from way_maxstay where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from relation_maxweight where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from relation_maxaxleload where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from relation_maxheight where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from relation_maxwidth where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from relation_maxlength where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from relation_maxdraught where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from relation_maxspeed where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from relation_minspeed where p_condition is not null union
+select *, coalesce(p_direction, 'unconditioned') s_direction from relation_maxstay where p_condition is not null
+]]

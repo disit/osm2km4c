@@ -1,0 +1,128 @@
+# 	OSM2KM4C
+#   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU Affero General Public License as
+#   published by the Free Software Foundation, either version 3 of the
+#   License, or (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU Affero General Public License for more details.
+#
+#   You should have received a copy of the GNU Affero General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix km4cr: <http://www.disit.org/km4city/resource#> .
+@prefix km4c: <http://www.disit.org/km4city/schema#> .
+@prefix org: <http://www.w3.org/ns/org#> .
+@prefix wot: <http://xmlns.com/wot/0.1/> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix time: <http://www.w3.org/2006/time#> .
+@prefix vann: <http://purl.org/vocab/vann/> .
+@prefix schema: <http://schema.org/> .
+@prefix gis: <http://www.opengis.net/ont/geosparql#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix otn: <http://www.pms.ifi.uni-muenchen.de/OTN#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix cc: <http://creativecommons.org/ns#> .
+@prefix gr: <http://purl.org/goodrelations/v1#> .
+@prefix vs: <http://www.w3.org/2003/06/sw-vocab-status/ns#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix ssn: <https://www.w3.org/ns/ssn/> .
+@prefix dcam: <http://purl.org/dc/dcam/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix geo: <http://www.w3.org/2003/01/geo/wgs84_pos#> .
+@prefix rr: <http://www.w3.org/ns/r2rml#> .
+@prefix km-dev: <http://isi.edu/integration/karma/dev#> .
+
+_:node1c0h22e8hx1 a km-dev:R2RMLMapping ;
+	km-dev:sourceName "TPLBus_stops2osm" ;
+	km-dev:modelPublicationTime "1512401090834"^^xsd:long ;
+	km-dev:modelVersion "1.5" ;
+	km-dev:hasWorksheetHistory "[{\"tags\":[\"Modeling\"],\"inputParameters\":[{\"name\":\"worksheetId\",\"value\":\"W\",\"type\":\"worksheetId\"},{\"name\":\"properties\",\"value\":{\"hasServiceProperties\":false,\"hasPrefix\":true,\"graphName\":\"\",\"prefix\":\"s\",\"hasBaseURI\":true,\"baseURI\":\"http://localhost:8080/source/\"},\"type\":\"other\"}],\"commandName\":\"SetWorksheetPropertiesCommand\"},{\"tags\":[\"Modeling\"],\"inputParameters\":[{\"name\":\"hNodeId\",\"value\":[{\"columnName\":\"StopsTXTKey\"}],\"type\":\"hNodeId\"},{\"name\":\"SemanticTypesArray\",\"value\":[{\"FullType\":\"http://purl.org/dc/terms/identifier\",\"isPrimary\":true,\"DomainLabel\":\"km4c:TransferServiceAndRenting1 (add)\",\"DomainId\":\"http://www.disit.org/km4city/schema#TransferServiceAndRenting1 (add)\",\"DomainUri\":\"http://www.disit.org/km4city/schema#TransferServiceAndRenting\"}],\"type\":\"other\"},{\"name\":\"worksheetId\",\"value\":\"W\",\"type\":\"worksheetId\"},{\"name\":\"isKey\",\"value\":true,\"type\":\"other\"},{\"name\":\"trainAndShowUpdates\",\"value\":false,\"type\":\"other\"},{\"name\":\"rdfLiteralType\",\"value\":\"\",\"type\":\"other\"}],\"commandName\":\"SetSemanticTypeCommand\"},{\"tags\":[\"Modeling\"],\"inputParameters\":[{\"name\":\"metaPropertyName\",\"value\":\"isUriOfClass\",\"type\":\"other\"},{\"name\":\"metaPropertyValue\",\"value\":\"http://www.disit.org/km4city/schema#Node\",\"type\":\"other\"},{\"name\":\"hNodeId\",\"value\":[{\"columnName\":\"osm_node_id\"}],\"type\":\"hNodeId\"},{\"name\":\"SemanticTypesArray\",\"value\":[{\"FullType\":\"http://isi.edu/integration/karma/dev#classLink\",\"isPrimary\":true,\"DomainLabel\":\"km4c:Node1 (add)\",\"DomainId\":\"http://www.disit.org/km4city/schema#Node1 (add)\",\"DomainUri\":\"http://www.disit.org/km4city/schema#Node\"}],\"type\":\"other\"},{\"name\":\"worksheetId\",\"value\":\"W\",\"type\":\"worksheetId\"},{\"name\":\"isKey\",\"value\":false,\"type\":\"other\"},{\"name\":\"trainAndShowUpdates\",\"value\":false,\"type\":\"other\"},{\"name\":\"rdfLiteralType\",\"value\":\"\",\"type\":\"other\"}],\"commandName\":\"SetMetaPropertyCommand\"}]" .
+
+km-dev:TriplesMap_93df1a9a-cc03-4f76-8910-27a5dea81d5f a rr:TriplesMap .
+
+_:node1c0h22e8hx1 km-dev:hasTriplesMap km-dev:TriplesMap_93df1a9a-cc03-4f76-8910-27a5dea81d5f .
+
+km-dev:TriplesMap_93df1a9a-cc03-4f76-8910-27a5dea81d5f km-dev:isPartOfMapping _:node1c0h22e8hx1 .
+
+_:node1c0h22e8hx2 rr:tableName "TPLBus_stops2osm" ;
+	a rr:LogicalTable ;
+	km-dev:isPartOfMapping _:node1c0h22e8hx1 .
+
+_:node1c0h22e8hx1 km-dev:hasLogicalTable _:node1c0h22e8hx2 .
+
+km-dev:TriplesMap_93df1a9a-cc03-4f76-8910-27a5dea81d5f rr:logicalTable _:node1c0h22e8hx2 ;
+	rr:subjectMap _:node1c0h22e8hx3 .
+
+_:node1c0h22e8hx1 km-dev:hasSubjectMap _:node1c0h22e8hx3 .
+
+_:node1c0h22e8hx3 km-dev:isPartOfMapping _:node1c0h22e8hx1 ;
+	a rr:SubjectMap ;
+	km-dev:alignmentNodeId "http://www.disit.org/km4city/schema#Node2" ;
+	rr:class km4c:Node ;
+	rr:template "{osm_node_id}" .
+
+km-dev:TriplesMap_492d742b-e0d6-4276-a0f8-ca423f5b5592 a rr:TriplesMap .
+
+_:node1c0h22e8hx1 km-dev:hasTriplesMap km-dev:TriplesMap_492d742b-e0d6-4276-a0f8-ca423f5b5592 .
+
+km-dev:TriplesMap_492d742b-e0d6-4276-a0f8-ca423f5b5592 km-dev:isPartOfMapping _:node1c0h22e8hx1 .
+
+_:node1c0h22e8hx4 rr:tableName "TPLBus_stops2osm" ;
+	a rr:LogicalTable ;
+	km-dev:isPartOfMapping _:node1c0h22e8hx1 .
+
+_:node1c0h22e8hx1 km-dev:hasLogicalTable _:node1c0h22e8hx4 .
+
+km-dev:TriplesMap_492d742b-e0d6-4276-a0f8-ca423f5b5592 rr:logicalTable _:node1c0h22e8hx4 ;
+	rr:subjectMap _:node1c0h22e8hx5 .
+
+_:node1c0h22e8hx1 km-dev:hasSubjectMap _:node1c0h22e8hx5 .
+
+_:node1c0h22e8hx5 km-dev:isPartOfMapping _:node1c0h22e8hx1 ;
+	a rr:SubjectMap ;
+	km-dev:alignmentNodeId "http://www.disit.org/km4city/schema#TransferServiceAndRenting1" ;
+	rr:class km4c:TransferServiceAndRenting ;
+	rr:template "http://www.disit.org/km4city/resource/{StopsTXTKey}" ;
+	a km-dev:steinerTreeRootNode .
+
+km-dev:PredicateObjectMap_aa28450d-9c4f-4a78-9286-9025474ed01d rr:predicate dcterms:identifier .
+
+_:node1c0h22e8hx6 rr:column "StopsTXTKey" ;
+	a rr:ObjectMap ;
+	km-dev:isPartOfMapping _:node1c0h22e8hx1 .
+
+_:node1c0h22e8hx1 km-dev:hasObjectMap _:node1c0h22e8hx6 .
+
+km-dev:PredicateObjectMap_aa28450d-9c4f-4a78-9286-9025474ed01d rr:objectMap _:node1c0h22e8hx6 .
+
+km-dev:TriplesMap_492d742b-e0d6-4276-a0f8-ca423f5b5592 rr:predicateObjectMap km-dev:PredicateObjectMap_aa28450d-9c4f-4a78-9286-9025474ed01d .
+
+km-dev:PredicateObjectMap_aa28450d-9c4f-4a78-9286-9025474ed01d a rr:PredicateObjectMap ;
+	km-dev:isPartOfMapping _:node1c0h22e8hx1 .
+
+_:node1c0h22e8hx1 km-dev:hasPredicateObjectMap km-dev:PredicateObjectMap_aa28450d-9c4f-4a78-9286-9025474ed01d .
+
+km-dev:PredicateObjectMap_a9736321-402c-40e9-9496-cb221acd351f rr:predicate foaf:based_near .
+
+km-dev:RefObjectMap_3a20b6e0-237c-42f5-a783-2a45d4285717 a rr:RefObjectMap , rr:ObjectMap ;
+	rr:parentTriplesMap km-dev:TriplesMap_93df1a9a-cc03-4f76-8910-27a5dea81d5f ;
+	km-dev:isPartOfMapping _:node1c0h22e8hx1 .
+
+_:node1c0h22e8hx1 km-dev:hasObjectMap km-dev:RefObjectMap_3a20b6e0-237c-42f5-a783-2a45d4285717 .
+
+km-dev:PredicateObjectMap_a9736321-402c-40e9-9496-cb221acd351f rr:objectMap km-dev:RefObjectMap_3a20b6e0-237c-42f5-a783-2a45d4285717 .
+
+km-dev:TriplesMap_492d742b-e0d6-4276-a0f8-ca423f5b5592 rr:predicateObjectMap km-dev:PredicateObjectMap_a9736321-402c-40e9-9496-cb221acd351f .
+
+km-dev:PredicateObjectMap_a9736321-402c-40e9-9496-cb221acd351f a rr:PredicateObjectMap ;
+	km-dev:isPartOfMapping _:node1c0h22e8hx1 .
+
+_:node1c0h22e8hx1 km-dev:hasPredicateObjectMap km-dev:PredicateObjectMap_a9736321-402c-40e9-9496-cb221acd351f .

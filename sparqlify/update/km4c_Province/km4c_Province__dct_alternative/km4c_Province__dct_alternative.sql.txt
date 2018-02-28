@@ -1,0 +1,133 @@
+/* OSM2KM4C
+   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
+
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU Affero General Public License as
+   published by the Free Software Foundation, either version 3 of the
+   License, or (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU Affero General Public License for more details.
+
+   You should have received a copy of the GNU Affero General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
+
+-- CONFIGURAZIONE DELL'INSTALLAZIONE
+------------------------------------
+
+-- Delimitazione geografica dell'installazione
+
+drop table if exists extra_config_boundaries; 
+
+create table extra_config_boundaries as 
+select * from extra_all_boundaries where relation_id in (276369);
+
+create index extra_config_boundaries_index_1 on extra_config_boundaries using gist(boundary);
+
+create index extra_config_boundaries_index_2 on extra_config_boundaries using gist(bbox);
+
+create index extra_config_boundaries_index_3 on extra_config_boundaries using gist(centroid);
+
+-- Grafo
+
+drop table if exists extra_config_graph ;
+
+create table extra_config_graph (
+id serial primary key,
+graph_uri varchar(255)
+);
+
+insert into extra_config_graph(graph_uri) values ('http://www.disit.org/km4city/graph/OSM/CA'); 
+
+-- Utilizzo dei numeri civici della Regione Toscana piuttosto che nativi di OSM
+
+drop table if exists extra_config_civic_num ;
+
+create table extra_config_civic_num (
+id serial primary key,
+civic_num_source varchar(255)
+);
+
+-- insert into extra_config_civic_num(civic_num_source) values ('Regione Toscana'); -- decommentare questa riga per utilizzare i numeri civici della Regione Toscana
+insert into extra_config_civic_num(civic_num_source) values ('Open Street Map'); -- decommentare questa riga per utilizzare i numeri civici nativi di Open Street Map
+
+
+/********************************************
+************ TABELLE DI APPOGGIO ************
+*********************************************/
+
+-- Esplosione delle way
+
+drop table if exists extra_ways;
+
+create table extra_ways as
+select prev_waynode.way_id global_id, prev_waynode.sequence_id local_id, prev_node.geom start_node, next_node.geom end_node, prev_node.id prev_node_id, next_node.id next_node_id
+from way_nodes prev_waynode 
+join nodes prev_node on prev_waynode.node_id = prev_node.id
+join way_nodes next_waynode on prev_waynode.way_id = next_waynode.way_id and prev_waynode.sequence_id = next_waynode.sequence_id-1
+join nodes next_node on next_waynode.node_id = next_node.id
+join way_tags on prev_waynode.way_id = way_tags.way_id and way_tags.k = 'highway' and way_tags.v <> 'proposed'
+join extra_config_boundaries boundaries on ST_Covers(boundaries.boundary, next_node.geom);
+
+create index on extra_ways (global_id);
+
+create index on extra_ways using gist(start_node);
+
+create index on extra_ways using gist(end_node);
+
+-- Comuni di interesse
+
+drop table if exists extra_comuni;
+
+create table extra_comuni as
+select relations.id relation_id, extra_all_boundaries.centroid, extra_all_boundaries.boundary boundary, extra_all_boundaries.bbox bbox
+from relations 
+join relation_tags tag_type on relations.id = tag_type.relation_id and tag_type.k = 'type' and tag_type.v = 'boundary'
+join relation_tags boundary on relations.id = boundary.relation_id and boundary.k = 'boundary' and boundary.v = 'administrative'
+join relation_tags admin_level on relations.id = admin_level.relation_id and admin_level.k = 'admin_level' and admin_level.v = '8' 
+-- join relation_tags catasto on relations.id = catasto.relation_id and catasto.k = 'ref:catasto' -- taglio sugli italiani
+join extra_all_boundaries on relations.id = extra_all_boundaries.relation_id
+join extra_config_boundaries on ST_Covers(extra_config_boundaries.boundary, extra_all_boundaries.boundary);
+
+create index extra_comuni_index_1 on extra_comuni using gist(centroid);
+
+create index extra_comuni_index_2 on extra_comuni using gist(boundary);
+
+create index extra_comuni_index_3 on extra_comuni using gist(bbox);
+
+-- Province di interesse
+
+drop table if exists extra_province;
+
+create table extra_province as
+select relations.id relation_id, extra_all_boundaries.centroid, extra_all_boundaries.boundary boundary, extra_all_boundaries.bbox bbox
+from relations 
+join relation_tags tag_type on relations.id = tag_type.relation_id and tag_type.k = 'type' and tag_type.v = 'boundary'
+join relation_tags boundary on relations.id = boundary.relation_id and boundary.k = 'boundary' and boundary.v = 'administrative'
+join relation_tags admin_level on relations.id = admin_level.relation_id and admin_level.k = 'admin_level' and admin_level.v = '6' 
+join extra_all_boundaries on relations.id = extra_all_boundaries.relation_id
+join extra_config_boundaries on ST_Covers(extra_config_boundaries.boundary, extra_all_boundaries.boundary);
+
+create index extra_province_index_1 on extra_province using gist(centroid);
+
+create index extra_province_index_2 on extra_province using gist(boundary);
+
+create index extra_province_index_3 on extra_province using gist(bbox);
+
+/********** Province.Alternative **********/
+
+drop table if exists ProvinceAlternative ;
+
+Create Table ProvinceAlternative As
+select distinct graph_uri, 'OS' || lpad(r.id::text,11,'0') || 'PR' id,
+       r_short_name.v alternative
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'boundary'
+  join relation_tags r_boundary on r.id = r_boundary.relation_id and r_boundary.k = 'boundary' and r_boundary.v = 'administrative'
+  join relation_tags r_admin_level on r.id = r_admin_level.relation_id and r_admin_level.k = 'admin_level' and r_admin_level.v = '6'
+  join relation_tags r_short_name on r.id = r_short_name.relation_id and r_short_name.k = 'short_name'
+  join extra_province prov_of_interest on r.id = prov_of_interest.relation_id 
+  join extra_config_graph cfg on 1=1
+;
