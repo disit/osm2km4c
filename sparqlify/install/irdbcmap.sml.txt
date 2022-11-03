@@ -21,6 +21,7 @@ Prefix geo:<http://www.w3.org/2003/01/geo/wgs84_pos#>
 Prefix fn:<http://aksw.org/sparqlify/>
 Prefix rdf:<http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 Prefix rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+Prefix schema:<http://schema.org/>
 
 /*******************************
 *********** Province ***********
@@ -32,7 +33,7 @@ Create View ProvinceURI As
 
 Construct {
 Graph ?graph_uri {
-	?s a km4c:Province
+	?s a km4c:Province ; a km4c:NamedArea
 }}
 
 With
@@ -97,6 +98,24 @@ From [[
 select * from ProvinceAlternative
 ]]
 
+/********** Province.Geometry *****************/
+
+Create View ProvinceGeometry As
+
+Construct {
+Graph ?graph_uri {
+?s geo:geometry ?geometry .
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?id))
+?geometry = typedLiteral(?geometry, "http://www.openlinksw.com/schemas/virtrdf#Geometry")
+
+From [[
+select * from ProvinceGeometry
+]]
+
 /********** Province.hasMunicipality **********/
 
 Create View ProvinceHasMunicipality As
@@ -125,7 +144,7 @@ Create View MunicipalityURI As
 
 Construct {
 Graph ?graph_uri {
-?s a km4c:Municipality
+?s a km4c:Municipality; a km4c:NamedArea
 }}
 
 With
@@ -190,6 +209,24 @@ From [[
 select * from MunicipalityAlternative
 ]]
 
+/********** Municipality.Geometry *****************/
+
+Create View MunicipalityGeometry As
+
+Construct {
+Graph ?graph_uri {
+?s geo:geometry ?geometry .
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?id))
+?geometry = typedLiteral(?geometry, "http://www.openlinksw.com/schemas/virtrdf#Geometry")
+
+From [[
+select * from MunicipalityGeometry
+]]
+
 /********** Municipality.isPartOfProvince **********/
 
 Create View MunicipalityIsPartOfProvince As
@@ -217,6 +254,7 @@ Create view Hamlet As
 Construct {
 Graph ?graph_uri {
 ?hamlet a km4c:Hamlet .
+?hamlet a km4c:NamedPoint . 
 ?hamlet km4c:inMunicipalityOf ?municipality .
 ?hamlet foaf:name ?hamletName .
 ?hamlet geo:lat ?lat .
@@ -868,6 +906,82 @@ From [[
 select * from RoadElementEndsAtNode 
  ]] 
 
+/********** AdministrativeRoad **********/
+
+Create view AdministrativeRoad As
+
+Construct {
+Graph ?graph_uri {
+?ar_uri a km4c:AdministrativeRoad . 
+?ar_uri dct:identifier ?ar_id .
+?ar_uri km4c:adRoadName ?ar_name .
+?ar_uri dct:alternative ?ar_alternative .
+?ar_uri km4c:adminClass ?ar_admin_class .
+?ar_uri km4c:ownerAuthority ?municipality_uri
+}}
+
+With 
+?graph_uri = uri(?graph_uri)
+?ar_uri = uri(concat("http://www.disit.org/km4city/resource/", ?id))
+?ar_id = plainLiteral(?id)
+?ar_name = plainLiteral(?ad_road_name)
+?ar_alternative = plainLiteral(?alternative)
+?ar_admin_class = plainLiteral(?admin_class)
+?municipality_uri = uri(concat("http://www.disit.org/km4city/resource/", ?municipality_id)) 
+
+From [[
+select distinct graph_uri, id, ad_road_name, alternative, admin_class, municipality_id from AdministrativeRoad
+]]
+
+Create View AdministrativeRoadNameGeneric As
+
+Construct {
+Graph ?graph_uri {
+?ar km4c:adRoadNameGeneric ?arng
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?ar = uri(concat("http://www.disit.org/km4city/resource/", ?id))
+?arng = plainLiteral(?ad_road_name_generic)
+
+From [[
+select * from AdministrativeRoadNameGeneric
+]]
+
+Create View AdministrativeRoadNameSpecific As
+
+Construct {
+Graph ?graph_uri {
+?ar km4c:adRoadNameSpecific ?arns
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?ar = uri(concat("http://www.disit.org/km4city/resource/", ?id))
+?arns = plainLiteral(?ad_road_name_specific)
+
+From [[
+select * from AdministrativeRoadNameSpecific
+]]
+
+Create view AdministrativeRoadElement As
+
+Construct {
+Graph ?graph_uri {
+?ar_uri km4c:hasRoadElement ?re_uri .
+?re_uri km4c:formingAdminRoad ?ar_uri
+}}
+
+With 
+?graph_uri = uri(?graph_uri)
+?ar_uri = uri(concat("http://www.disit.org/km4city/resource/", ?id))
+?re_uri = uri(concat("http://www.disit.org/km4city/resource/", ?eid))
+
+From [[
+select * from AdministrativeRoad
+]]
+
 /****************************************
 *********** Istanziazione di ************
 *********** StreetNumber e Entry ********
@@ -1157,7 +1271,7 @@ Create View RegionURI As
 
 Construct {
 Graph ?graph_uri {
-	?s a km4c:Region
+	?s a km4c:Region; a km4c:NamedArea
 }}
 
 With
@@ -1220,6 +1334,24 @@ With
 
 From [[
 select * from RegionAlternative
+]]
+
+/********** Region.Geometry *****************/
+
+Create View RegionGeometry As
+
+Construct {
+Graph ?graph_uri {
+?s geo:geometry ?geometry .
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?s = uri(concat("http://www.disit.org/km4city/resource/", ?id))
+?geometry = typedLiteral(?geometry, "http://www.openlinksw.com/schemas/virtrdf#Geometry")
+
+From [[
+select * from RegionGeometry
 ]]
 
 /********** Region.hasProvince **********/
@@ -2040,4 +2172,212 @@ With
 
 From [[
 select * from WayStreetNumberPlace
+]]
+
+/************************************************
+******** NamedArea ******************************
+************************************************/
+
+/******* ResidentialArea ***********************/
+
+Create View ResidentialArea As
+Construct {
+Graph ?graph_uri {
+	?area_id a km4c:ResidentialArea ; 
+		a ?area_type ;
+		dct:identifier ?area_dct_id ; 
+		km4c:inMunicipalityOf ?municipality;
+		foaf:name ?area_name;
+		geo:geometry ?geometry		
+}}
+With
+?graph_uri = uri(?graph_uri)
+?area_id = uri(concat("http://www.disit.org/km4city/resource/", ?area_id))
+?area_dct_id = plainLiteral(?area_id)
+?municipality = uri(concat("http://www.disit.org/km4city/resource/", ?municipality_id))
+?area_name = plainLiteral(?area_name)
+?geometry = typedLiteral(?geometry, "http://www.openlinksw.com/schemas/virtrdf#Geometry")
+?area_type = uri(?area_type)
+From [[
+select distinct graph_uri, area_id, municipality_id, coalesce(area_name,'Unnamed Residential Area') area_name, case when area_name is null then 'http://www.disit.org/km4city/schema#UnnamedArea' else 'http://www.disit.org/km4city/schema#NamedArea' end area_type, geometry from ResidentialArea where name_language is null 
+]]
+
+Create View ResidentialAreaLocalizedNames As
+Construct {
+Graph ?graph_uri {
+	?area_id foaf:name ?area_name		
+}}
+With
+?graph_uri = uri(?graph_uri)
+?area_id = uri(concat("http://www.disit.org/km4city/resource/", ?area_id))
+?area_name = plainLiteral(?area_name,?name_language)
+From [[
+select distinct graph_uri, area_id, coalesce(area_name,'Unnamed Residential Area') area_name, name_language from ResidentialArea where name_language is not null
+]]
+
+Create View ResidentialAreaLinkedHamlets As
+Construct {
+Graph ?graph_uri {
+	?area_id rdfs:seeAlso ?linked_hamlet .
+	?linked_hamlet rdfs:seeAlso ?area_id
+}}
+With
+?graph_uri = uri(?graph_uri)
+?area_id = uri(concat("http://www.disit.org/km4city/resource/", ?area_id))
+?linked_hamlet = uri(concat("http://www.disit.org/km4city/resource/", ?linked_hamlet))
+From [[
+select distinct graph_uri, area_id, regexp_split_to_table(linked_hamlet,'\|') linked_hamlet from ResidentialArea where linked_hamlet is not null
+]]
+
+/******* CommercialArea ***********************/
+
+Create View CommercialArea As
+Construct {
+Graph ?graph_uri {
+	?area_id a km4c:CommercialArea ; 
+		a ?area_type ;
+		dct:identifier ?area_dct_id ; 
+		km4c:inMunicipalityOf ?municipality;
+		foaf:name ?area_name;
+		geo:geometry ?geometry		
+}}
+With
+?graph_uri = uri(?graph_uri)
+?area_id = uri(concat("http://www.disit.org/km4city/resource/", ?area_id))
+?area_dct_id = plainLiteral(?area_id)
+?municipality = uri(concat("http://www.disit.org/km4city/resource/", ?municipality_id))
+?area_name = plainLiteral(?area_name)
+?geometry = typedLiteral(?geometry, "http://www.openlinksw.com/schemas/virtrdf#Geometry")
+?area_type = uri(?area_type)
+From [[
+select distinct graph_uri, area_id, municipality_id, coalesce(area_name,'Unnamed Commercial Area') area_name, case when area_name is null then 'http://www.disit.org/km4city/schema#UnnamedArea' else 'http://www.disit.org/km4city/schema#NamedArea' end area_type, geometry from CommercialArea where name_language is null
+]]
+
+Create View CommercialAreaLocalizedNames As
+Construct {
+Graph ?graph_uri {
+	?area_id foaf:name ?area_name		
+}}
+With
+?graph_uri = uri(?graph_uri)
+?area_id = uri(concat("http://www.disit.org/km4city/resource/", ?area_id))
+?area_name = plainLiteral(?area_name,?name_language)
+From [[
+select distinct graph_uri, area_id, coalesce(area_name,'Unnamed Commercial Area') area_name, name_language from CommercialArea where name_language is not null
+]]
+
+Create View CommercialAreaLinkedHamlets As
+Construct {
+Graph ?graph_uri {
+	?area_id rdfs:seeAlso ?linked_hamlet .
+	?linked_hamlet rdfs:seeAlso ?area_id
+}}
+With
+?graph_uri = uri(?graph_uri)
+?area_id = uri(concat("http://www.disit.org/km4city/resource/", ?area_id))
+?linked_hamlet = uri(concat("http://www.disit.org/km4city/resource/", ?linked_hamlet))
+From [[
+select distinct graph_uri, area_id, regexp_split_to_table(linked_hamlet,'\|') linked_hamlet from CommercialArea where linked_hamlet is not null
+]]
+
+/******* IndustrialArea ***********************/
+
+Create View IndustrialArea As
+Construct {
+Graph ?graph_uri {
+	?area_id a km4c:IndustrialArea ; 
+		a ?area_type ;
+		dct:identifier ?area_dct_id ;
+		km4c:inMunicipalityOf ?municipality;
+		foaf:name ?area_name;
+		geo:geometry ?geometry		
+}}
+With
+?graph_uri = uri(?graph_uri)
+?area_id = uri(concat("http://www.disit.org/km4city/resource/", ?area_id))
+?area_dct_id = plainLiteral(?area_id)
+?municipality = uri(concat("http://www.disit.org/km4city/resource/", ?municipality_id))
+?area_name = plainLiteral(?area_name)
+?geometry = typedLiteral(?geometry, "http://www.openlinksw.com/schemas/virtrdf#Geometry")
+?area_type = uri(?area_type)
+From [[
+select distinct graph_uri, area_id, municipality_id, coalesce(area_name,'Unnamed Industrial Area') area_name, case when area_name is null then 'http://www.disit.org/km4city/schema#UnnamedArea' else 'http://www.disit.org/km4city/schema#NamedArea' end area_type, geometry from IndustrialArea where name_language is null
+]]
+
+Create View IndustrialAreaLocalizedNames As
+Construct {
+Graph ?graph_uri {
+	?area_id foaf:name ?area_name		
+}}
+With
+?graph_uri = uri(?graph_uri)
+?area_id = uri(concat("http://www.disit.org/km4city/resource/", ?area_id))
+?area_name = plainLiteral(?area_name,?name_language)
+From [[
+select distinct graph_uri, area_id, coalesce(area_name,'Unnamed Industrial Area') area_name, name_language from IndustrialArea where name_language is not null
+]]
+
+Create View IndustrialAreaLinkedHamlets As
+Construct {
+Graph ?graph_uri {
+	?area_id rdfs:seeAlso ?linked_hamlet .
+	?linked_hamlet rdfs:seeAlso ?area_id
+}}
+With
+?graph_uri = uri(?graph_uri)
+?area_id = uri(concat("http://www.disit.org/km4city/resource/", ?area_id))
+?linked_hamlet = uri(concat("http://www.disit.org/km4city/resource/", ?linked_hamlet))
+From [[
+select distinct graph_uri, area_id, regexp_split_to_table(linked_hamlet,'\|') linked_hamlet from IndustrialArea where linked_hamlet is not null
+]]
+
+/****************************************
+*********** Istanziazione di ************
+*********** StreetNumber e Entry ********
+*********** dai building names **********
+*********** legati con la Road **********
+*********** attraverso la distanza ******
+****************************************/
+
+Create view BuildingNameStreetNumberRoad As
+
+Construct {
+Graph ?graph_uri {
+?cn a km4c:StreetNumber .
+?cn dct:identifier ?identifier .
+?cn km4c:extendNumber ?extend_number .
+?cn km4c:number ?number .
+?cn km4c:exponent ?exponent .
+?cn km4c:belongToRoad ?road .
+?road km4c:hasStreetNumber ?cn .
+?cn km4c:classCode ?classCode .
+?cn km4c:hasExternalAccess ?ne .
+?ne a km4c:Entry .
+?ne dct:identifier ?ne_identifier .
+?ne km4c:entryType ?entryType .
+?ne geo:long ?long .
+?ne geo:lat ?lat .
+?ne km4c:porteCochere ?porteCochere .
+?ne km4c:placedInElement ?re
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?cn = uri(concat("http://www.disit.org/km4city/resource/", ?cn_id))
+?identifier = plainLiteral(?cn_id)
+?extend_number = plainLiteral(?extend_number)
+?number = plainLiteral(?number)
+?exponent = plainLiteral(?exponent)
+?road = uri(concat("http://www.disit.org/km4city/resource/", ?road_id))
+?classCode = plainLiteral(?class_code)
+?ne = uri(concat("http://www.disit.org/km4city/resource/", ?en_id))
+?ne_identifier = plainLiteral(?en_id)
+?entryType = plainLiteral(?entry_type)
+?long = typedLiteral(?long, "http://www.w3.org/2001/XMLSchema#float")
+?lat = typedLiteral(?lat, "http://www.w3.org/2001/XMLSchema#float")
+?porteCochere = plainLiteral(?porte_cochere)
+?re = uri(concat("http://www.disit.org/km4city/resource/", ?re_id))
+
+From [[
+select * from BuildingNameStreetNumberRoad
 ]]

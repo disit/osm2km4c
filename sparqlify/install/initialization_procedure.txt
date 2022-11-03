@@ -1,0 +1,38 @@
+-- DO NOT SIMPLY CUT AND PASTE. TURN YOUR BRAIN ON.
+---------------------------------------------------
+
+wget http://download.geofabrik.de/europe/portugal-latest.osm.pbf
+createdb pgsimple_prt
+psql -d pgsimple_prt
+	CREATE EXTENSION postgis;
+	CREATE EXTENSION hstore;
+psql -d pgsimple_prt -f ~/osmosis/script/pgsimple_schema_0.6.sql
+psql -d pgsimple_prt -f ~/osmosis/script/pgsimple_schema_0.6_action.sql	
+psql -d pgsimple_prt -f ~/osmosis/script/pgsimple_schema_0.6_bbox.sql
+psql -d pgsimple_prt -f ~/osmosis/script/pgsimple_schema_0.6_linestring.sql
+mkdir /home/debian/geofabrick/portugal-latest-copy 
+/home/debian/osmosis/bin/osmosis --read-pbf file=/home/debian/geofabrick/spain-latest.osm.pbf --write-pgsimp-dump directory=/home/debian/geofabrick/spain-latest-copy enableBboxBuilder=yes enableLinestringBuilder=yes 
+cp /home/debian/geofabrick/italy-latest-copy/pgsimple_load_0.6.sql /home/debian/geofabrick/portugal-latest-copy/
+cd /home/debian/geofabrick/portugal-latest-copy/
+psql -d pgsimple_prt -f pgsimple_load_0.6.sql
+psql -d pgsimple_prt
+	create user pgsimple_prt_reader with password 'pgsimple_prt_reader';
+	grant connect on database pgsimple_prt to pgsimple_prt_reader;
+	grant usage on schema public to pgsimple_prt_reader;
+	grant select on all tables in schema public to pgsimple_prt_reader;
+su -
+su postgres
+vi /etc/postgresql/9.6/main/pg_hba.conf
+-- EDIT CONFIGURATION APPROPRIATELY (TWO ROWS, ADD READ ACCESS FOR NEW USER)
+/usr/lib/postgresql/9.6/bin/pg_ctl reload -D /etc/postgresql/9.6/main
+su debian
+psql -d pgsimple_prt
+	select 'INSERT INTO extra_generic_namings(naming) values (' || substring(roadname.v from '[^ ]+'::text) || ''');' generic_name from ways join way_tags highway on ways.id = highway.way_id and highway.k = 'highway' join way_tags roadname on ways.id = roadname.way_id and roadname.k = 'name' group by generic_name having count(1) >= 100
+	-- INTEGRATE performance_optimization.sql WITH GENERIC ROAD NAMINGS THAT ARE IN USE IN THE NEW COUNTRY
+	-- FIX identifier of country
+	-- COPY NEW VERSION OF performance_optimization in /home/debian/geofabrick/portugal-latest-copy
+psql -d pgsimple_prt -f /home/debian/geofabrick/portugal-latest-copy/performance_optimization.sql
+psql -d pgsimple_prt -c "grant select on all tables in schema public to pgsimple_prt_reader;"
+
+-- INITIALIZATION OF NEW TERRITORY IS COMPLETE
+-- NOW STEP FORWARD TO GENERATING CUSTOM TABLES AND TRIPLES FOR TERRITORIES OF YOUR INTEREST WITHIN THE BOUNDARIES OF THE NEWLY AVAILABLE COUNTRY 

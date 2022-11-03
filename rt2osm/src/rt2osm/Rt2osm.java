@@ -70,6 +70,8 @@ public class Rt2osm {
                 concat(pVirtuosoPort),pVirtuosoUsername,
                 pVirtuosoPassword, pVirtuosoTargetGraph);
         
+        ((VirtuosoRepository)repos).setQueryTimeout(1800);
+        
         repos.initialize();
         
         try ( RepositoryConnection reposConn = repos.getConnection() ) {
@@ -126,14 +128,12 @@ public class Rt2osm {
             "  from named <"+pVirtuosoRTGraph+"> "+
             "  from named <"+pVirtuosoOSMGraph+"> { " +
             "  graph <"+pVirtuosoRTGraph+"> { " +
-            "    ?tr a km4c:Road ; " +
-            "    km4c:extendName ?tn ; " +
+            "    ?tr km4c:extendName ?tn ; " +
             "    km4c:inMunicipalityOf ?tm . " +
             "    ?tm dct:alternative ?tma. " +
             "  } " +
             "  graph <"+pVirtuosoOSMGraph+"> { " +
-            "    ?r a km4c:Road ; " +
-            "    km4c:extendName ?n ; " +
+            "    ?r km4c:extendName ?n ; " +
             "    km4c:inMunicipalityOf ?m . " +
             "    ?m dct:alternative ?tma. " +
             "  } " +
@@ -143,6 +143,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
                 prepareTupleQuery(QueryLanguage.SPARQL,
                         query );
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try (TupleQueryResult result = targetQuery.evaluate()) {
 
@@ -179,16 +181,14 @@ public class Rt2osm {
             "  { " +
             "    select (?et as ?det) (?eo as ?deo) ?dist where { " +
             "      graph <"+pVirtuosoRTGraph+"> { " +
-            "        ?rt a km4c:Road ; " +
-            "          km4c:containsElement ?et . " +
+            "        ?rt km4c:containsElement ?et . " +
             "        ?et km4c:startsAtNode ?est ; " +
             "          km4c:endsAtNode ?eet . " +
             "        ?est geo:geometry ?esgt . " +
             "        ?eet geo:geometry ?eegt . " +
             "      } " +
             "      graph <"+pVirtuosoOSMGraph+"> { " +
-            "        ?ro a km4c:Road ; " +
-            "          km4c:containsElement ?eo . " +
+            "        ?ro km4c:containsElement ?eo . " +
             "        ?eo km4c:startsAtNode ?eso ; " +
             "          km4c:endsAtNode ?eeo . " +
             "        ?eso geo:geometry ?esgo . " +
@@ -203,16 +203,14 @@ public class Rt2osm {
             "  { " +
             "    select ( ?et as ?get ) ( min(?dist) as ?mindist ) where { " +
             "      graph <"+pVirtuosoRTGraph+"> { " +
-            "        ?rt a km4c:Road ; " +
-            "          km4c:containsElement ?et . " +
+            "        ?rt km4c:containsElement ?et . " +
             "        ?et km4c:startsAtNode ?est ; " +
             "          km4c:endsAtNode ?eet . " +
             "        ?est geo:geometry ?esgt . " +
             "        ?eet geo:geometry ?eegt . " +
             "      } " +
             "      graph <"+pVirtuosoOSMGraph+"> { " +
-            "        ?ro a km4c:Road ; " +
-            "          km4c:containsElement ?eo . " +
+            "        ?ro km4c:containsElement ?eo . " +
             "        ?eo km4c:startsAtNode ?eso ; " +
             "          km4c:endsAtNode ?eeo . " +
             "        ?eso geo:geometry ?esgo . " +
@@ -231,6 +229,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
                 prepareTupleQuery(QueryLanguage.SPARQL,
                         elementsQuery1 );
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try (TupleQueryResult result = targetQuery.evaluate()) {
 
@@ -267,16 +267,14 @@ public class Rt2osm {
             "  { " +
             "    select (?et as ?det) (?eo as ?deo) ?dist where { " +
             "      graph <"+pVirtuosoRTGraph+"> { " +
-            "        ?rt a km4c:Road ; " +
-            "          km4c:containsElement ?et . " +
+            "        ?rt km4c:containsElement ?et . " +
             "        ?et km4c:startsAtNode ?est ; " +
             "          km4c:endsAtNode ?eet . " +
             "        ?est geo:geometry ?esgt . " +
             "        ?eet geo:geometry ?eegt . " +
             "      } " +
             "      graph <"+pVirtuosoOSMGraph+"> { " +
-            "        ?ro a km4c:Road ; " +
-            "          km4c:containsElement ?eo . " +
+            "        ?ro km4c:containsElement ?eo . " +
             "        ?eo km4c:startsAtNode ?eso ; " +
             "          km4c:endsAtNode ?eeo . " +
             "        ?eso geo:geometry ?esgo . " +
@@ -291,16 +289,14 @@ public class Rt2osm {
             "  { " +
             "    select ( ?eo as ?got ) ( min(?dist) as ?mindist ) where { " +
             "      graph <"+pVirtuosoRTGraph+"> { " +
-            "        ?rt a km4c:Road ; " +
-            "          km4c:containsElement ?et . " +
+            "        ?rt km4c:containsElement ?et . " +
             "        ?et km4c:startsAtNode ?est ; " +
             "          km4c:endsAtNode ?eet . " +
             "        ?est geo:geometry ?esgt . " +
             "        ?eet geo:geometry ?eegt . " +
             "      } " +
             "      graph <"+pVirtuosoOSMGraph+"> { " +
-            "        ?ro a km4c:Road ; " +
-            "          km4c:containsElement ?eo . " +
+            "        ?ro km4c:containsElement ?eo . " +
             "        ?eo km4c:startsAtNode ?eso ; " +
             "          km4c:endsAtNode ?eeo . " +
             "        ?eso geo:geometry ?esgo . " +
@@ -324,6 +320,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
                 prepareTupleQuery(QueryLanguage.SPARQL,
                         elementsQuery1 );
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try (TupleQueryResult result = targetQuery.evaluate()) {
 
@@ -366,7 +364,6 @@ public class Rt2osm {
             "  } " +
             "  graph <"+pVirtuosoRTGraph+"> { " +
             "    { " +
-            "      ?tn a km4c:Node . " +
             "      ?te1 km4c:startsAtNode ?tn . " +
             "      ?te2 km4c:startsAtNode ?tn . " +
             "      ?tr km4c:containsElement ?te1 . " +
@@ -378,7 +375,6 @@ public class Rt2osm {
             "    } " +
             "    UNION" +
             "    {" +
-            "      ?tn a km4c:Node. " +
             "      ?te1 km4c:startsAtNode ?tn. " +
             "      ?te2 km4c:endsAtNode ?tn. " +
             "      ?tr km4c:containsElement ?te1 . " +
@@ -390,7 +386,6 @@ public class Rt2osm {
             "    } " +
             "    UNION " +
             "    { " +
-            "      ?tn a km4c:Node. " +
             "      ?te1 km4c:endsAtNode ?tn. " +
             "      ?te2 km4c:startsAtNode ?tn. " +
             "      ?tr km4c:containsElement ?te1 . " +
@@ -402,7 +397,6 @@ public class Rt2osm {
             "    } " +
             "    UNION " +
             "    { " +
-            "      ?tn a km4c:Node. " +
             "      ?te1 km4c:endsAtNode ?tn. " +
             "      ?te2 km4c:endsAtNode ?tn. " +
             "      ?tr km4c:containsElement ?te1 . " +
@@ -415,7 +409,6 @@ public class Rt2osm {
             "  } " +
             "  graph <"+pVirtuosoOSMGraph+"> { " +
             "    { " +
-            "      ?n a km4c:Node. " +
             "      ?e1 km4c:startsAtNode ?n . " +
             "      ?e2 km4c:startsAtNode ?n . " +
             "      ?r km4c:containsElement ?e1 . " +
@@ -427,7 +420,6 @@ public class Rt2osm {
             "    } " +
             "    UNION " +
             "    { " +
-            "      ?n a km4c:Node . " +
             "      ?e1 km4c:startsAtNode ?n . " +
             "      ?e2 km4c:endsAtNode ?n . " +
             "      ?r km4c:containsElement ?e1 . " +
@@ -439,7 +431,6 @@ public class Rt2osm {
             "    } " +
             "    UNION " +
             "    { " +
-            "      ?n a km4c:Node. " +
             "      ?e1 km4c:endsAtNode ?n . " +
             "      ?e2 km4c:startsAtNode ?n . " +
             "      ?r km4c:containsElement ?e1 . " +
@@ -451,7 +442,6 @@ public class Rt2osm {
             "    } " +
             "    UNION " +
             "    { " +
-            "      ?n a km4c:Node . " +
             "      ?e1 km4c:endsAtNode ?n . " +
             "      ?e2 km4c:endsAtNode ?n . " +
             "      ?r km4c:containsElement ?e1 . " +
@@ -504,6 +494,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
             prepareTupleQuery(QueryLanguage.SPARQL, 
                     baseQuery + constraint + " } " );
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try ( TupleQueryResult result = targetQuery.evaluate() ) {
 
@@ -529,6 +521,9 @@ public class Rt2osm {
                     add("owl:sameAs", r2IRI);
             }
             
+        }
+        catch(Exception e) {
+            return false;
         }
         
         return wasGeneratedSomething;
@@ -545,6 +540,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
             prepareTupleQuery(QueryLanguage.SPARQL, 
                     baseQuery + constraint + " } " );
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try ( TupleQueryResult result = targetQuery.evaluate() ) {
 
@@ -570,6 +567,9 @@ public class Rt2osm {
                     add("owl:sameAs", r2IRI);
             }
             
+        }
+        catch(Exception e) {
+            return false;
         }
         
         return wasGeneratedSomething;
@@ -586,6 +586,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
             prepareTupleQuery(QueryLanguage.SPARQL, 
                     baseQuery + constraint + " } " );
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try ( TupleQueryResult result = targetQuery.evaluate() ) {
 
@@ -611,6 +613,9 @@ public class Rt2osm {
                     add("owl:sameAs", r2IRI);
             }
             
+        }
+        catch(Exception e) {
+            return false;
         }
         
         return wasGeneratedSomething;
@@ -627,6 +632,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
             prepareTupleQuery(QueryLanguage.SPARQL, 
                     baseQuery + constraint + " } " );
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try ( TupleQueryResult result = targetQuery.evaluate() ) {
 
@@ -652,6 +659,9 @@ public class Rt2osm {
                     add("owl:sameAs", r2IRI);
             }
             
+        }
+        catch(Exception e) {
+            return false;
         }
         
         return wasGeneratedSomething;
@@ -668,6 +678,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
             prepareTupleQuery(QueryLanguage.SPARQL, 
                     baseQuery + constraint + " } " );
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try ( TupleQueryResult result = targetQuery.evaluate() ) {
 
@@ -693,6 +705,9 @@ public class Rt2osm {
                     add("owl:sameAs", r2IRI);
             }
             
+        }
+        catch(Exception e) {
+            return false;
         }
         
         return wasGeneratedSomething;
@@ -709,6 +724,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
             prepareTupleQuery(QueryLanguage.SPARQL, 
                     baseQuery + constraint + " } " );
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try ( TupleQueryResult result = targetQuery.evaluate() ) {
 
@@ -734,6 +751,9 @@ public class Rt2osm {
                     add("owl:sameAs", r2IRI);
             }
             
+        }
+        catch(Exception e) {
+            return false;
         }
         
         return wasGeneratedSomething;
@@ -750,6 +770,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
             prepareTupleQuery(QueryLanguage.SPARQL, 
                     baseQuery + constraint + " } " );
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try ( TupleQueryResult result = targetQuery.evaluate() ) {
 
@@ -776,6 +798,9 @@ public class Rt2osm {
             }
             
         }
+        catch(Exception e) {
+            return false;
+        }
         
         return wasGeneratedSomething;
         
@@ -791,6 +816,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
                 prepareTupleQuery(QueryLanguage.SPARQL,
                         baseQuery + constraint + " } ");
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try (TupleQueryResult result = targetQuery.evaluate()) {
 
@@ -816,6 +843,9 @@ public class Rt2osm {
                         add("owl:sameAs", r2IRI);
             }
 
+        }
+        catch(Exception e) {
+            return false;
         }
 
         return wasGeneratedSomething;
@@ -832,6 +862,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
                 prepareTupleQuery(QueryLanguage.SPARQL,
                         baseQuery + constraint + " } ");
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try (TupleQueryResult result = targetQuery.evaluate()) {
 
@@ -858,6 +890,9 @@ public class Rt2osm {
             }
 
         }
+        catch(Exception e) {
+            return false;
+        }
 
         return wasGeneratedSomething;
 
@@ -872,7 +907,6 @@ public class Rt2osm {
             " from named <"+pVirtuosoTargetGraph+"> { " +    
             "  graph <"+pVirtuosoOSMGraph+"> { " +
             "    { " +
-            "      ?n a km4c:Node . " +
             "      ?e1 km4c:startsAtNode ?n . " +
             "      ?e2 km4c:startsAtNode ?n. " +
             "      ?r km4c:containsElement ?e1 . " +
@@ -885,7 +919,6 @@ public class Rt2osm {
             "    } " +
             "    UNION " +
             "    { " +
-            "      ?n a km4c:Node. " +
             "      ?e1 km4c:startsAtNode ?n. " +
             "      ?e2 km4c:endsAtNode ?n. " +
             "      ?r km4c:containsElement ?e1 . " +
@@ -898,7 +931,6 @@ public class Rt2osm {
             "    } " +
             "    UNION " +
             "    { " +
-            "      ?n a km4c:Node . " +
             "      ?e1 km4c:endsAtNode ?n . " +
             "      ?e2 km4c:startsAtNode ?n . " +
             "      ?r km4c:containsElement ?e1 . " +
@@ -911,7 +943,6 @@ public class Rt2osm {
             "    } " +
             "    UNION " +
             "    { " +
-            "      ?n a km4c:Node . " +
             "      ?e1 km4c:endsAtNode ?n . " +
             "      ?e2 km4c:endsAtNode ?n . " +
             "      ?r km4c:containsElement ?e1 . " +
@@ -943,6 +974,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
                 prepareTupleQuery(QueryLanguage.SPARQL,
                         roadExtra1Query );
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try (TupleQueryResult result = targetQuery.evaluate()) {
 
@@ -969,6 +1002,9 @@ public class Rt2osm {
             }
 
         }
+        catch(Exception e) {
+            return false;
+        }
 
         return wasGeneratedSomething;
 
@@ -983,7 +1019,6 @@ public class Rt2osm {
             " from named <"+pVirtuosoTargetGraph+"> { " +    
             "  graph <"+pVirtuosoRTGraph+"> { " +
             "    { " +
-            "      ?n a km4c:Node . " +
             "      ?e1 km4c:startsAtNode ?n . " +
             "      ?e2 km4c:startsAtNode ?n . " +
             "      ?r km4c:containsElement ?e1 . " +
@@ -996,7 +1031,6 @@ public class Rt2osm {
             "    } " +
             "    UNION " +
             "    { " +
-            "      ?n a km4c:Node . " +
             "      ?e1 km4c:startsAtNode ?n . " +
             "      ?e2 km4c:endsAtNode ?n . " +
             "      ?r km4c:containsElement ?e1 . " +
@@ -1009,7 +1043,6 @@ public class Rt2osm {
             "    } " +
             "    UNION " +
             "    { " +
-            "      ?n a km4c:Node . " +
             "      ?e1 km4c:endsAtNode ?n . " +
             "      ?e2 km4c:startsAtNode ?n . " +
             "      ?r km4c:containsElement ?e1 . " +
@@ -1022,7 +1055,6 @@ public class Rt2osm {
             "    } " +
             "    UNION " +
             "    { " +
-            "      ?n a km4c:Node . " +
             "      ?e1 km4c:endsAtNode ?n . " +
             "      ?e2 km4c:endsAtNode ?n . " +
             "      ?r km4c:containsElement ?e1 . " +
@@ -1039,8 +1071,7 @@ public class Rt2osm {
             "    ?r2 km4c:roadType ?rt2 . " +
             "  } " +
             "  graph <"+pVirtuosoOSMGraph+"> { " +
-            "    ?tr a km4c:Road; " +
-            "      km4c:extendName ?trn . " +
+            "    ?tr km4c:extendName ?trn . " +
             "  } " +
             "  graph <"+pVirtuosoTargetGraph+"> { " +
             "    ?r owl:sameAs ?tr . " +
@@ -1055,6 +1086,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
                 prepareTupleQuery(QueryLanguage.SPARQL,
                         roadExtra2Query );
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try (TupleQueryResult result = targetQuery.evaluate()) {
 
@@ -1080,6 +1113,9 @@ public class Rt2osm {
                         add("owl:sameAs", r2IRI);
             }
 
+        }
+        catch(Exception e) {
+            return false;
         }
 
         return wasGeneratedSomething;
@@ -1096,6 +1132,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
                 prepareTupleQuery(QueryLanguage.SPARQL,
                         baseQuery + constraint + " } ");
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try (TupleQueryResult result = targetQuery.evaluate()) {
 
@@ -1121,6 +1159,9 @@ public class Rt2osm {
                         add("owl:sameAs", r2IRI);
             }
 
+        }
+        catch(Exception e) {
+            return false;
         }
 
         return wasGeneratedSomething;
@@ -1137,6 +1178,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
                 prepareTupleQuery(QueryLanguage.SPARQL,
                         baseQuery + constraint + " } ");
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try (TupleQueryResult result = targetQuery.evaluate()) {
 
@@ -1163,6 +1206,9 @@ public class Rt2osm {
             }
 
         }
+        catch(Exception e) {
+            return false;
+        }
 
         return wasGeneratedSomething;
 
@@ -1176,10 +1222,8 @@ public class Rt2osm {
             " from named <"+pVirtuosoOSMGraph+"> " + 
             " from named <"+pVirtuosoTargetGraph+"> { " +    
             "  graph <"+pVirtuosoOSMGraph+"> { " +
-            "    ?r a km4c:Road ; " +
-            "      km4c:extendName ?n . " +
-            "    ?r2 a km4c:Road ; " +
-            "      km4c:extendName ?n . " +
+            "    ?r km4c:extendName ?n . " +
+            "    ?r2 km4c:extendName ?n . " +
             "    filter( ?r != ?r2 ) " +
             "  } " +
             "  graph <"+pVirtuosoTargetGraph+"> { " +
@@ -1196,6 +1240,8 @@ public class Rt2osm {
         TupleQuery targetQuery = reposConn.
                 prepareTupleQuery(QueryLanguage.SPARQL,
                         roadExtra3Query );
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try (TupleQueryResult result = targetQuery.evaluate()) {
 
@@ -1222,6 +1268,9 @@ public class Rt2osm {
             }
 
         }
+        catch(Exception e) {
+            return false;
+        }
 
         return wasGeneratedSomething;
 
@@ -1232,26 +1281,23 @@ public class Rt2osm {
         
         String optimizeSparql = 
             " select * from named <"+graph+"> { graph <"+graph+"> { " +
-            "    ?s a km4c:Municipality ; " +
-            "    foaf:name \""+pMunicipalityName+"\" . " +
-            "    ?r a km4c:Road ; " +
-            "    km4c:inMunicipalityOf ?s ; " +
+            "    ?s foaf:name \""+pMunicipalityName+"\" . " +
+            "    ?r km4c:inMunicipalityOf ?s ; " +
             "    km4c:containsElement ?e ; " +
             "    km4c:extendName ?en ; " +
             "    km4c:roadName ?rn ; " +
             "    km4c:roadType ?rt . " +
             "    ?s dct:alternative ?sa . " +
-            "    ?e a km4c:RoadElement ; " +
-            "    km4c:startsAtNode ?esn ; " +
+            "    ?e km4c:startsAtNode ?esn ; " +
             "    km4c:endsAtNode ?een . " +
-            "    ?esn a km4c:Node ; " +
-            "    geo:geometry ?esng . " +
-            "    ?een a km4c:Node ; " +
-            "    geo:geometry ?eeng . " +
+            "    ?esn geo:geometry ?esng . " +
+            "    ?een geo:geometry ?eeng . " +
             "}}";
 
         TupleQuery targetQuery = reposConn.
             prepareTupleQuery(QueryLanguage.SPARQL, optimizeSparql);
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try ( TupleQueryResult result = targetQuery.evaluate() ) {
 
@@ -1274,10 +1320,10 @@ public class Rt2osm {
                 ValueFactory vFactory = SimpleValueFactory.getInstance();
                 IRI sIRI = vFactory.createIRI(s.stringValue());
                 IRI eIRI = vFactory.createIRI(e.stringValue());
-                Literal enLiteral = vFactory.createLiteral(en.stringValue());
-                Literal rnLiteral = vFactory.createLiteral(rn.stringValue());
-                Literal rtLiteral = vFactory.createLiteral(rt.stringValue());
-                Literal saLiteral = vFactory.createLiteral(sa.stringValue());
+                Literal enLiteral = vFactory.createLiteral(en  != null ? en.stringValue() : "");
+                Literal rnLiteral = vFactory.createLiteral(rn != null ? rn.stringValue() : "");
+                Literal rtLiteral = vFactory.createLiteral(rt != null ? rt.stringValue() : "");
+                Literal saLiteral = vFactory.createLiteral(sa != null ? sa.stringValue() : "");
                 IRI esnIRI = vFactory.createIRI(esn.stringValue());
                 IRI eenIRI = vFactory.createIRI(een.stringValue());
                 IRI geom = vFactory.createIRI("http://www.openlinksw.com/schemas/virtrdf#Geometry");
@@ -1362,6 +1408,8 @@ String provinceSparql = "select ?op ?tp " +
 
         TupleQuery targetQuery = reposConn.
             prepareTupleQuery(QueryLanguage.SPARQL, provinceSparql);
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try ( TupleQueryResult result = targetQuery.evaluate() ) {
 
@@ -1405,6 +1453,8 @@ String provinceSparql = "select ?op ?tp " +
 
         TupleQuery targetQuery = reposConn.
             prepareTupleQuery(QueryLanguage.SPARQL, municipalitiesSparql);
+        
+        targetQuery.setMaxExecutionTime(1800);
 
         try ( TupleQueryResult result = targetQuery.evaluate() ) {
 
@@ -1559,7 +1609,7 @@ String provinceSparql = "select ?op ?tp " +
                     "Launch without arguments for usage guide."); 
         }
                 
-        if((!pIdle.isEmpty()) && (!"roads".equals(pWhat))) {
+        if((!pIdle.isEmpty()) && (!"roads-step".equals(pWhat))) {
             throw new Exception("Illegal argument: Idle time. " + 
                     "Launch without arguments for usage guide."); 
         }

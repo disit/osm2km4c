@@ -1,19 +1,6 @@
-/* OSM2KM4C
-   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
-
-   This program is free software: you can redistribute it and/or modify
-   it under the terms of the GNU Affero General Public License as
-   published by the Free Software Foundation, either version 3 of the
-   License, or (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU Affero General Public License for more details.
-
-   You should have received a copy of the GNU Affero General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-   
+/** 
+ * Licensed under GNU Affero General Public License v3.0
+ */
 package org.disit.latlon2osnode;
 
 import java.sql.Connection;
@@ -308,7 +295,7 @@ public class SearchEngine {
     
     */
     
-    public Way getWay(Municipality m, Node pt, int restrictions) throws Exception {
+    public Way getWay(Municipality m, Node pt, int restrictions, ArrayList<String> exclude) throws Exception {
         
         /* VERY OLD
         String query = "select ways.id from ways "
@@ -356,6 +343,7 @@ public class SearchEngine {
             "join way_tags highway on ways.id = highway.way_id and highway.k = 'highway' " +
             "join extra_all_boundaries on ST_Intersects(extra_all_boundaries.boundary, ways.linestring) " +
             "where extra_all_boundaries.relation_id = "+m.getOsmId()+
+            (exclude.size() > 0 ? " and not ways.id in (" + String.join(",", exclude) + ") " : "") + 
             " order by ST_Distance(ways.linestring, ST_GeogFromText(ST_AsText(ST_MakePoint("+pt.getLon()+","+pt.getLat()+")))) " +
             "limit 1";
         
@@ -370,6 +358,7 @@ public class SearchEngine {
                 " and ( ( highway.v <> 'motorway' and highway.v <> 'motorway_link' and highway.v <> 'bridleway' and highway.v <> 'cycleway' " +
                 "and (not coalesce(access.v,'--') like '%private%') and coalesce(access.v, '--') <> 'no' " +
                 "and coalesce(foot.v,'--') <> 'private' and coalesce(foot.v, '--') <> 'no' ) or coalesce(foot.v, 'no') <> 'no' ) " +
+                (exclude.size() > 0 ? " and not ways.id in (" + String.join(",", exclude) + ") " : "") + 
                 "order by ST_Distance(ways.linestring, ST_GeogFromText(ST_AsText(ST_MakePoint("+pt.getLon()+","+pt.getLat()+")))) " +
                 "limit 1";
         }
@@ -406,7 +395,7 @@ public class SearchEngine {
         
     }
 
-    public Node getNode(Municipality municip, Way way, Node latlon) throws Exception {
+    public Node getNode(Municipality municip, Way way, Node latlon, ArrayList<String> exclude) throws Exception {
         
         /*
         String query = "select nodes.id " +
@@ -426,7 +415,7 @@ public class SearchEngine {
             "order by ST_Distance(ST_GeogFromText(ST_AsText(nodes.geom)), ST_MakePoint("+latlon.getLon()+", "+latlon.getLat()+") )"
             + "limit 1";
         */
-        
+       
                 String query = "select nodes.id " +
             " from ways " +
             " join way_nodes on ways.id = way_nodes.way_id " +
@@ -434,6 +423,7 @@ public class SearchEngine {
             " join extra_all_boundaries on ST_Covers(extra_all_boundaries.boundary, ST_GeogFromText(ST_AsText(ST_MakePoint("+latlon.getLon()+","+latlon.getLat()+")))) " +            
             " where ways.id = " + way.getOsmId() +
             " and extra_all_boundaries.relation_id = "+municip.getOsmId()+" and ST_Covers(extra_all_boundaries.boundary,nodes.geom) " +
+            (exclude.size() > 0 ? " and not nodes.id in (" + String.join(",", exclude) + ") " : "") + 
             "order by ST_Distance(ST_GeogFromText(ST_AsText(nodes.geom)), ST_GeogFromText(ST_AsText(ST_MakePoint("+latlon.getLon()+","+latlon.getLat()+"))) )"
             + "limit 1";
         
@@ -456,7 +446,7 @@ public class SearchEngine {
                 if(rs.next()) 
                     return new Node(rs.getString(1));
                 else
-                    throw new Exception("Node not found");
+                    return null;
             } catch(Exception e) {
                 throw new Exception("ERROR: NODE");
             }

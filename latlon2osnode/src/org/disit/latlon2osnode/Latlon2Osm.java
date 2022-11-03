@@ -1,24 +1,13 @@
-/* OSM2KM4C
-   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
-
-   This program is free software: you can redistribute it and/or modify
-   it under the terms of the GNU Affero General Public License as
-   published by the Free Software Foundation, either version 3 of the
-   License, or (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU Affero General Public License for more details.
-
-   You should have received a copy of the GNU Affero General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-   
+/** 
+ * Licensed under GNU Affero General Public License v3.0
+ */
 package org.disit.latlon2osnode;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.Arrays;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -86,14 +75,29 @@ public class Latlon2Osm extends HttpServlet {
                    }
             }
             
+            ArrayList<String> excludeNodes = new ArrayList<>();
+            if(request.getParameter("exclude_nodes") != null) {
+                excludeNodes = new ArrayList<>(Arrays.asList(request.getParameter("exclude_nodes").split(",")));
+            }
+            
+            ArrayList<String> excludeWays = new ArrayList<>();
+            if(request.getParameter("exclude_ways") != null) {
+                excludeWays = new ArrayList<>(Arrays.asList(request.getParameter("exclude_ways").split(",")));
+            }
+            
             Node pt = new Node (
                     Double.parseDouble(request.getParameter("lat")), 
                     Double.parseDouble(request.getParameter("lon"))
             );
 
             Properties p = new Properties();
-            try (FileInputStream file = new FileInputStream(System.getProperty("user.home")+
-                    getServletConfig().getInitParameter("CfgFileUserHomeRelPath"))) {
+            String cfgFile = getServletConfig().getInitParameter("CfgFileUserHomeRelPath");
+            if(null != request.getParameter("cfg")) {
+                cfgFile = request.getParameter("cfg");
+            }
+            try (
+                    FileInputStream file = new FileInputStream(System.getProperty("user.home")+
+                    cfgFile)) {
                 p.load(file);
             }
             catch(Exception e) { 
@@ -147,7 +151,7 @@ public class Latlon2Osm extends HttpServlet {
             
                 Municipality municipality = engine.getMunicipality(pt);
                 
-                Way way = engine.getWay(municipality, pt, restrictions);
+                Way way = engine.getWay(municipality, pt, restrictions, excludeWays);
                             
                 out.print(way);
 
@@ -159,9 +163,15 @@ public class Latlon2Osm extends HttpServlet {
             
                 Municipality municipality = engine.getMunicipality(pt);
                 
-                Way way = engine.getWay(municipality, pt, restrictions);
+                Way way = engine.getWay(municipality, pt, restrictions, excludeWays);
                 
-                Node node = engine.getNode(municipality, way, pt);
+                Node node = engine.getNode(municipality, way, pt, excludeNodes);
+                
+                while(node == null) {
+                    excludeWays.add(Integer.toString(way.getOsmId()));
+                    way = engine.getWay(municipality, pt, restrictions, excludeWays);
+                    node = engine.getNode(municipality, way, pt, excludeNodes);
+                }
                 
                 out.print(node);
                 
@@ -171,6 +181,7 @@ public class Latlon2Osm extends HttpServlet {
             PrintWriter out = response.getWriter();
             out.println("ERROR");
             out.println(e.getMessage());
+            out.flush();
         }
     }
 

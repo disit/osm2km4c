@@ -1,0 +1,99 @@
+/* OSM2KM4C
+   Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
+
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU Affero General Public License as
+   published by the Free Software Foundation, either version 3 of the
+   License, or (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU Affero General Public License for more details.
+
+   You should have received a copy of the GNU Affero General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
+   
+Prefix km4c:<http://www.disit.org/km4city/schema#>
+Prefix dct:<http://purl.org/dc/terms/>
+Prefix foaf:<http://xmlns.com/foaf/0.1/>
+Prefix geo:<http://www.w3.org/2003/01/geo/wgs84_pos#>
+Prefix fn:<http://aksw.org/sparqlify/>
+Prefix rdf:<http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+Prefix rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+
+/********** AdministrativeRoad **********/
+
+Create view AdministrativeRoad As
+
+Construct {
+Graph ?graph_uri {
+?ar_uri a km4c:AdministrativeRoad . 
+?ar_uri dct:identifier ?ar_id .
+?ar_uri km4c:adRoadName ?ar_name .
+?ar_uri dct:alternative ?ar_alternative .
+?ar_uri km4c:adminClass ?ar_admin_class .
+?ar_uri km4c:ownerAuthority ?municipality_uri
+}}
+
+With 
+?graph_uri = uri(?graph_uri)
+?ar_uri = uri(concat("http://www.disit.org/km4city/resource/", ?id))
+?ar_id = plainLiteral(?id)
+?ar_name = plainLiteral(?ad_road_name)
+?ar_alternative = plainLiteral(?alternative)
+?ar_admin_class = plainLiteral(?admin_class)
+?municipality_uri = uri(concat("http://www.disit.org/km4city/resource/", ?municipality_id)) 
+
+From [[
+select distinct graph_uri, id, ad_road_name, alternative, admin_class, municipality_id from AdministrativeRoad
+]]
+
+Create View AdministrativeRoadNameGeneric As
+
+Construct {
+Graph ?graph_uri {
+?ar km4c:adRoadNameGeneric ?arng
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?ar = uri(concat("http://www.disit.org/km4city/resource/", ?id))
+?arng = plainLiteral(?ad_road_name_generic)
+
+From [[
+select * from AdministrativeRoadNameGeneric
+]]
+
+Create View AdministrativeRoadNameSpecific As
+
+Construct {
+Graph ?graph_uri {
+?ar km4c:adRoadNameSpecific ?arns
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?ar = uri(concat("http://www.disit.org/km4city/resource/", ?id))
+?arns = plainLiteral(?ad_road_name_specific)
+
+From [[
+select * from AdministrativeRoadNameSpecific
+]]
+
+Create view AdministrativeRoadElement As
+
+Construct {
+Graph ?graph_uri {
+?ar_uri km4c:hasRoadElement ?re_uri .
+?re_uri km4c:formingAdminRoad ?ar_uri
+}}
+
+With 
+?graph_uri = uri(?graph_uri)
+?ar_uri = uri(concat("http://www.disit.org/km4city/resource/", ?id))
+?re_uri = uri(concat("http://www.disit.org/km4city/resource/", ?eid))
+
+From [[
+select * from AdministrativeRoad
+]]

@@ -2,22 +2,6 @@
     Document   : index
     Created on : 16-giu-2017, 10.07.04
     Author     : disit
-	
-	OSM2KM4C
-    Copyright (C) 2017 DISIT Lab http://www.disit.org - University of Florence
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as
-    published by the Free Software Foundation, either version 3 of the
-    License, or (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 --%>
 
 <%@page contentType="text/html" pageEncoding="UTF-8"%>
@@ -74,6 +58,25 @@ restrictions: you can omit this, the default
               value is 0. If set to 1, the paths
               and nodes that cannot be reached by
               a pedestrian are excluded.
+
+cfg: you can omit this, the default configuration
+     will be used. Otherwise, you can specify one
+     of the available configurations, and it will
+     be employed. A configuration defines where
+     the tool searches (host, db, user, password).
+
+exclude_nodes: a comma separated list of OSM Node
+    IDs that must be ignored. If one of those is 
+    eliged for being returned, an alternative 
+    is automatically searched by the service.
+
+exclude_ways: a comma separated list of OSM Way
+    IDS that must be ignored. If one of those is 
+    eliged for being returned, an alternative 
+    is automatically searched by the service. If 
+    a node is eliged for being returned that 
+    belongs to an excluded way, an alternative 
+    is automatically searched by the service.
 
 The service accesses a Postgresql relational 
 database structured as a simple schema populated 

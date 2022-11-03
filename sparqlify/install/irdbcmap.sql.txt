@@ -22,7 +22,7 @@
 drop table if exists extra_config_boundaries; 
 
 create table extra_config_boundaries as 
-select * from extra_all_boundaries where relation_id in (276369);
+select * from extra_all_boundaries where relation_id in (42472);
 
 create index extra_config_boundaries_index_1 on extra_config_boundaries using gist(boundary);
 
@@ -39,7 +39,7 @@ id serial primary key,
 graph_uri varchar(255)
 );
 
-insert into extra_config_graph(graph_uri) values ('http://www.disit.org/km4city/graph/OSM/CA'); 
+insert into extra_config_graph(graph_uri) values ('http://www.disit.org/km4city/resource/OSM/anversa'); 
 
 -- Utilizzo dei numeri civici della Regione Toscana piuttosto che nativi di OSM
 
@@ -131,26 +131,47 @@ and province_short_name.k = 'short_name';
 drop table if exists extra_suburbs;
 
 create table extra_suburbs as
-select suburb.id, suburb.centroid, suburb.boundary, suburb.suburb_type, suburb.suburb_name, extra_comuni.relation_id municipality_id
+select distinct suburb.id, suburb.centroid, suburb.boundary, suburb.suburb_type, suburb.suburb_name, extra_comuni.relation_id municipality_id
 from 
 (
 -- suburb ways
 select ways.id, 
-	ST_GeomFromText(ST_AsText(ST_Centroid(ST_ConvexHull(ST_Collect(ways.linestring)))),4326) centroid, 
-	ST_GeomFromText(ST_AsText(ST_ConvexHull(ST_Collect(linestring))),4326) boundary, 
+	--ST_GeomFromText(ST_AsText(ST_Centroid(ST_ConvexHull(ST_Collect(ways.linestring)))),4326) centroid, 
+	ST_GeomFromText(ST_AsText(ST_Centroid(ST_MakePolygon(ST_GeomFromText(ST_AsText(ST_AddPoint(linestring, ST_PointN(linestring, 1))))))),4326) centroid,
+	--ST_GeomFromText(ST_AsText(ST_ConvexHull(ST_Collect(linestring))),4326) boundary, 
+	ST_GeomFromText(ST_AsText(ST_MakePolygon(ST_GeomFromText(ST_AsText(ST_AddPoint(linestring, ST_PointN(linestring, 1)))))),4326) boundary,
 	'W'::text suburb_type, way_suburb_name.v suburb_name 
 from ways
 join way_tags boundary on ways.id = boundary.way_id and boundary.k = 'boundary' and boundary.v = 'administrative'
 join way_tags admin_level on ways.id = admin_level.way_id and admin_level.k = 'admin_level' and cast(admin_level.v as int) > 8 
 join way_tags way_suburb_name on ways.id = way_suburb_name.way_id and way_suburb_name.k = 'name'
+where ST_NumPoints(ways.linestring) >= 4
+group by ways.id, way_suburb_name.v
+union
+select ways.id, 
+	--ST_GeomFromText(ST_AsText(ST_Centroid(ST_ConvexHull(ST_Collect(ways.linestring)))),4326) centroid, 
+	ST_GeomFromText(ST_AsText(ST_Centroid(ST_MakePolygon(ST_GeomFromText(ST_AsText(ST_AddPoint(linestring, ST_PointN(linestring, 1))))))),4326) centroid,
+	--ST_GeomFromText(ST_AsText(ST_ConvexHull(ST_Collect(linestring))),4326) boundary, 
+	ST_GeomFromText(ST_AsText(ST_MakePolygon(ST_GeomFromText(ST_AsText(ST_AddPoint(linestring, ST_PointN(linestring, 1)))))),4326) boundary,
+	'W'::text suburb_type, way_suburb_name.v suburb_name 
+from ways
+join way_tags on ways.id = way_tags.way_id and ( 
+	( way_tags.k = 'site' and way_tags.v in ('housing') ) or 
+	( way_tags.k = 'landuse' and way_tags.v in ('centre_zone','residential', 'industrial', 'commercial', 'retail') ) or 
+	( way_tags.k = 'place' and way_tags.v in ('city', 'city_block','hamlet','isolated_dwelling','neighbourhood','quarter','suburb','town','village') ) or 
+	( way_tags.k = 'boundary' and way_tags.v in ('quarter','city_limit','civil','town','urban','limited_traffic_zone','village') ) 
+)
+join way_tags way_suburb_name on ways.id = way_suburb_name.way_id and way_suburb_name.k = 'name'
+where ST_NumPoints(ways.linestring) >= 4
 group by ways.id, way_suburb_name.v
 union
 -- suburb relations
-select rsuburbs.*, rel_suburb_name.v suburb_name from 
+select rsuburbs.id, ST_GeomFromText(ST_AsText(ST_Centroid(ST_MakePolygon(ST_GeomFromText(ST_AsText(ST_AddPoint(tmp_boundary, ST_PointN(tmp_boundary, 1))),4326)))),4326) centroid, ST_GeomFromText(ST_AsText(ST_MakePolygon(ST_GeomFromText(ST_AsText(ST_AddPoint(tmp_boundary, ST_PointN(tmp_boundary, 1))),4326))),4326) boundary, rsuburbs.suburb_type, rel_suburb_name.v suburb_name from 
 (
 select relation_id id, 
-	ST_GeomFromText(ST_AsText(ST_Centroid(ST_ConvexHull(ST_Collect(linestring)))),4326) centroid, 
-	ST_GeomFromText(ST_AsText(ST_ConvexHull(ST_Collect(linestring))),4326) boundary, 
+	-- ST_GeomFromText(ST_AsText(ST_Centroid(ST_ConvexHull(ST_Collect(linestring)))),4326) centroid, 
+	--ST_GeomFromText(ST_AsText(ST_ConvexHull(ST_Collect(linestring))),4326) boundary, 
+	(ST_Dump(ST_GeomFromText(ST_AsText(ST_LineMerge(ST_Collect(linestring))),4326))).geom tmp_boundary,
 	'R'::text suburb_type from ( 
 	select relation_members.relation_id, ways.linestring
 	from relation_members 
@@ -161,9 +182,45 @@ select relation_id id,
  ) sub group by relation_id
 ) rsuburbs 
 join relation_tags rel_suburb_name on rsuburbs.id = rel_suburb_name.relation_id and rel_suburb_name.k = 'name'
+where ST_NumPoints(ST_GeomFromText(ST_AsText(ST_AddPoint(tmp_boundary, ST_PointN(tmp_boundary, 1))),4326)) >= 4
+union
+select rsuburbs.id, ST_GeomFromText(ST_AsText(ST_Centroid(ST_MakePolygon(ST_GeomFromText(ST_AsText(ST_AddPoint(tmp_boundary, ST_PointN(tmp_boundary, 1))),4326)))),4326) centroid, ST_GeomFromText(ST_AsText(ST_MakePolygon(ST_GeomFromText(ST_AsText(ST_AddPoint(tmp_boundary, ST_PointN(tmp_boundary, 1))),4326))),4326) boundary, rsuburbs.suburb_type, rel_suburb_name.v suburb_name from 
+(
+select relation_id id, 
+	--ST_GeomFromText(ST_AsText(ST_Centroid(ST_ConvexHull(ST_Collect(linestring)))),4326) centroid, 
+	-- ST_GeomFromText(ST_AsText(ST_ConvexHull(ST_Collect(linestring))),4326) boundary, 
+	(ST_Dump(ST_GeomFromText(ST_AsText(ST_LineMerge(ST_Collect(linestring))),4326))).geom tmp_boundary,
+	'R'::text suburb_type from ( 
+	select relation_members.relation_id, ways.linestring
+	from relation_members 
+	join ways on ways.id = relation_members.member_id and relation_members.member_type='W' 
+join relation_tags on relation_members.relation_id = relation_tags.relation_id and ( 
+	( relation_tags.k = 'site' and relation_tags.v in ('housing') ) or 
+	( relation_tags.k = 'landuse' and relation_tags.v in ('centre_zone','residential', 'industrial', 'commercial', 'retail') ) or 
+	( relation_tags.k = 'place' and relation_tags.v in ('city', 'city_block','hamlet','isolated_dwelling','neighbourhood','quarter','suburb','town','village') ) or 
+	( relation_tags.k = 'boundary' and relation_tags.v in ('quarter','city_limit','civil','town','urban','limited_traffic_zone','village') ) 
+)
+ ) sub group by relation_id
+) rsuburbs 
+join relation_tags rel_suburb_name on rsuburbs.id = rel_suburb_name.relation_id and rel_suburb_name.k = 'name'
+where ST_NumPoints(ST_GeomFromText(ST_AsText(ST_AddPoint(tmp_boundary, ST_PointN(tmp_boundary, 1))),4326)) >= 4
 union
 -- suburb nodes
-select id, geom centroid, geom boundary, 'N'::text suburb_type, nd_suburb_name.v suburb_name from nodes join node_tags on nodes.id = node_tags.node_id and node_tags.k = 'place' and node_tags.v = 'suburb' join node_tags nd_suburb_name on nodes.id = nd_suburb_name.node_id and nd_suburb_name.k = 'name'
+select id, geom centroid, geom boundary, 'N'::text suburb_type, nd_suburb_name.v suburb_name 
+from nodes 
+join node_tags b on nodes.id = b.node_id and b.k = 'boundary' and b.v = 'administrative' 
+join node_tags l on nodes.id = l.node_id and l.k = 'admin_level' and cast(l.v as int) > 8
+join node_tags nd_suburb_name on nodes.id = nd_suburb_name.node_id and nd_suburb_name.k = 'name'
+union
+select id, geom centroid, geom boundary, 'N'::text suburb_type, nd_suburb_name.v suburb_name 
+from nodes 
+join node_tags on nodes.id = node_tags.node_id and ( 
+	( node_tags.k = 'site' and node_tags.v in ('housing') ) or 
+	( node_tags.k = 'landuse' and node_tags.v in ('centre_zone','residential', 'industrial', 'commercial', 'retail') ) or 
+	( node_tags.k = 'place' and node_tags.v in ('city', 'city_block','hamlet','isolated_dwelling','neighbourhood','quarter','suburb','town','village') ) or 
+	( node_tags.k = 'boundary' and node_tags.v in ('quarter','city_limit','civil','town','urban','limited_traffic_zone','village') ) 
+)
+join node_tags nd_suburb_name on nodes.id = nd_suburb_name.node_id and nd_suburb_name.k = 'name'
 ) suburb
 join extra_comuni on ST_Covers(extra_comuni.boundary, suburb.boundary)
 ;
@@ -908,11 +965,11 @@ select distinct graph_uri, 'OS' || lpad(r.id::text,11,'0') || 'CO' id,
 drop table if exists Hamlet ;
 
 Create Table Hamlet As
-select distinct graph_uri, 'OS' || lpad(m.id::text,11,'0') || 'CO' || '/' || regexp_replace(t.suburb,'[^a-zA-Z]', '', 'g') hamlet_id,
+select distinct graph_uri, 'OS' || lpad(extra_suburbs.id::text,11,'0') || 'HT' hamlet_id,
        'OS' || lpad(m.id::text,11,'0') || 'CO' municipality_id,
        t.suburb hamlet_name,
-	ST_X(extra_suburbs.centroid::geometry) long, --
-	ST_Y(extra_suburbs.centroid::geometry) lat --
+	ST_X(extra_suburbs.centroid::geometry) long, 
+	ST_Y(extra_suburbs.centroid::geometry) lat
   from extra_toponym_city t 
   join relation_tags m_name on m_name.k = 'name' and m_name.v = t.city
   join relations m on m_name.relation_id = m.id
@@ -921,18 +978,23 @@ select distinct graph_uri, 'OS' || lpad(m.id::text,11,'0') || 'CO' || '/' || reg
   join relation_tags m_admin_level on m.id = m_admin_level.relation_id and m_admin_level.k = 'admin_level' and m_admin_level.v = '8'
   join extra_suburbs on extra_suburbs.municipality_id = m.id and extra_suburbs.suburb_name = t.suburb --
   join extra_config_graph cfg on 1=1
-  where not ((t.suburb = '') IS NOT FALSE)
+  where extra_suburbs.suburb_type = 'N'::text and not ((t.suburb = '') IS NOT FALSE)
 ;
 
 insert into Hamlet(graph_uri, hamlet_id, municipality_id, hamlet_name, long, lat) 
 select distinct graph_uri, 
-'OS' || lpad(m.relation_id::text,11,'0') || 'CO' || '/' || regexp_replace(place_name.v,'[^a-zA-Z]', '', 'g') hamlet_id,
+'OS' || lpad(nodes.id::text,11,'0') || 'HT' hamlet_id,
 'OS' || lpad(m.relation_id::text,11,'0') || 'CO' municipality_id,
 place_name.v hamlet_name,
 ST_X(nodes.geom) long, 
 ST_Y(nodes.geom) lat
 from nodes
-join node_tags place_suburb on nodes.id = place_suburb.node_id and place_suburb.k = 'place' and place_suburb.v = 'suburb'
+join node_tags place_suburb on nodes.id = place_suburb.node_id and ( 
+	( place_suburb.k = 'site' and place_suburb.v in ('housing') ) or 
+	( place_suburb.k = 'landuse' and place_suburb.v in ('centre_zone','residential', 'industrial', 'commercial', 'retail') ) or 
+	( place_suburb.k = 'place' and place_suburb.v in ('city', 'city_block','hamlet','isolated_dwelling','neighbourhood','quarter','suburb','town','village') ) or 
+	( place_suburb.k = 'boundary' and place_suburb.v in ('quarter','city_limit','civil','town','urban','limited_traffic_zone','village', 'administrative') ) 
+)
 join node_tags place_name on nodes.id = place_name.node_id and place_name.k = 'name'
 join extra_comuni m on ST_Covers(m.boundary, nodes.geom)
 join extra_config_graph cfg on 1=1;
@@ -1217,8 +1279,8 @@ select distinct graph_uri, 'OS' || lpad(r.id::text,11,'0') || 'SQ' road_id,
 drop table if exists RoadRelationInHamletOf ;
 
 Create Table RoadRelationInHamletOf As
-select distinct graph_uri, 'OS' || lpad(r.id::text,11,'0') || 'LR' road_id,
-       'OS' || lpad(m.id::text,11,'0') || 'CO' || '/' || regexp_replace(t.suburb,'[^a-zA-Z]', '', 'g') hamlet_id
+select distinct cfg.graph_uri, 'OS' || lpad(r.id::text,11,'0') || 'LR' road_id,
+       h.hamlet_id
   from relations r
   join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
   left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
@@ -1231,14 +1293,15 @@ select distinct graph_uri, 'OS' || lpad(r.id::text,11,'0') || 'LR' road_id,
   join relation_tags m_type on m.id = m_type.relation_id and m_type.k = 'type' and m_type.v = 'boundary'
   join relation_tags m_boundary on m.id = m_boundary.relation_id and m_boundary.k = 'boundary' and m_boundary.v = 'administrative'
   join relation_tags m_admin_level on m.id = m_admin_level.relation_id and m_admin_level.k = 'admin_level' and m_admin_level.v = '8'
+  join Hamlet h on h.hamlet_name = t.suburb and h.municipality_id = 'OS' || lpad(m.id::text,11,'0') || 'CO'
   join extra_config_graph cfg on 1=1
 where COALESCE(r_route.v,'road') = 'road'
    and COALESCE(r_network.v, '--') <> 'e-road' 
    and rwt.v <> 'proposed'
    AND not ((t.suburb = '') IS NOT FALSE)
 union
-select distinct graph_uri, 'OS' || lpad(r.id::text,11,'0') || 'SQ' road_id,
-       'OS' || lpad(m.id::text,11,'0') || 'CO' || '/' || regexp_replace(t.suburb,'[^a-zA-Z]', '', 'g') hamlet_id
+select distinct cfg.graph_uri, 'OS' || lpad(r.id::text,11,'0') || 'SQ' road_id,
+       h.hamlet_id
   from relations r
   join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'multipolygon'
   join relation_tags r_pedestrian on r.id = r_pedestrian.relation_id and r_pedestrian.k = 'highway' and r_pedestrian.v = 'pedestrian'
@@ -1249,6 +1312,7 @@ select distinct graph_uri, 'OS' || lpad(r.id::text,11,'0') || 'SQ' road_id,
   join relation_tags m_type on m.id = m_type.relation_id and m_type.k = 'type' and m_type.v = 'boundary'
   join relation_tags m_boundary on m.id = m_boundary.relation_id and m_boundary.k = 'boundary' and m_boundary.v = 'administrative'
   join relation_tags m_admin_level on m.id = m_admin_level.relation_id and m_admin_level.k = 'admin_level' and m_admin_level.v = '8'
+  join Hamlet h on h.hamlet_name = t.suburb and h.municipality_id = 'OS' || lpad(m.id::text,11,'0') || 'CO'
   join extra_config_graph cfg on 1=1
 where not ((t.suburb = '') IS NOT FALSE);
 
@@ -1446,8 +1510,8 @@ select r_ways.member_id global_way_id
 drop table if exists RoadWayInHamletOf ;
 
 Create Table RoadWayInHamletOf As
-select distinct graph_uri, 'OS' || lpad(wt.way_id::text,11,'0') || 'SR' road_id,
-       'OS' || lpad(m.id::text,11,'0') || 'CO' || '/' || regexp_replace(t.suburb,'[^a-zA-Z]', '', 'g') hamlet_id
+select distinct cfg.graph_uri, 'OS' || lpad(wt.way_id::text,11,'0') || 'SR' road_id,
+       h.hamlet_id
   from way_tags wt
   join extra_toponym_city t on wt.way_id = t.global_way_id 
   join relation_tags m_name on m_name.k = 'name' and m_name.v = t.city
@@ -1455,7 +1519,8 @@ select distinct graph_uri, 'OS' || lpad(wt.way_id::text,11,'0') || 'SR' road_id,
   join relation_tags m_type on m.id = m_type.relation_id and m_type.k = 'type' and m_type.v = 'boundary'
   join relation_tags m_boundary on m.id = m_boundary.relation_id and m_boundary.k = 'boundary' and m_boundary.v = 'administrative'
   join relation_tags m_admin_level on m.id = m_admin_level.relation_id and m_admin_level.k = 'admin_level' and m_admin_level.v = '8'
-  join extra_config_graph cfg on 1=1
+  join Hamlet h on h.hamlet_name = t.suburb and h.municipality_id = 'OS' || lpad(m.id::text,11,'0') || 'CO'
+  join extra_config_graph cfg on 1=1  
   left join relation_members rm on rm.member_type = 'W' and rm.member_id = wt.way_id and rm.relation_id in 
 (
 select r.id
@@ -1748,8 +1813,8 @@ select distinct graph_uri, 'OS' || lpad(t.global_way_id::text,11,'0') || 'RE/' |
 drop table if exists RoadElementHamlet ;
 
 Create Table RoadElementHamlet As
-select distinct graph_uri, 'OS' || lpad(t.global_way_id::text,11,'0') || 'RE/' || t.local_way_id way_id,
-       'OS' || lpad(m.id::text,11,'0') || 'CO' || '/' || regexp_replace(t.suburb,'[^a-zA-Z]', '', 'g') hamlet_id
+select distinct cfg.graph_uri, 'OS' || lpad(t.global_way_id::text,11,'0') || 'RE/' || t.local_way_id way_id,
+       h.hamlet_id
 from extra_toponym_city t
   join extra_config_graph cfg on 1=1
   join relation_tags m_name on m_name.k = 'name' and m_name.v = t.city
@@ -1757,10 +1822,11 @@ from extra_toponym_city t
   join relation_tags m_type on m.id = m_type.relation_id and m_type.k = 'type' and m_type.v = 'boundary'
   join relation_tags m_boundary on m.id = m_boundary.relation_id and m_boundary.k = 'boundary' and m_boundary.v = 'administrative'
   join relation_tags m_admin_level on m.id = m_admin_level.relation_id and m_admin_level.k = 'admin_level' and m_admin_level.v = '8'
+  join Hamlet h on h.hamlet_name = t.suburb and h.municipality_id = 'OS' || lpad(m.id::text,11,'0') || 'CO'
    where not ((t.suburb = '') IS NOT FALSE)
 union -- pedestrian (squares)
-select distinct graph_uri, 'OS' || lpad(t.global_way_id::text,11,'0') || 'RE/' || t.local_way_id way_id,
-       'OS' || lpad(m.id::text,11,'0') || 'CO' || '/' || regexp_replace(t.suburb,'[^a-zA-Z]', '', 'g') hamlet_id
+select distinct cfg.graph_uri, 'OS' || lpad(t.global_way_id::text,11,'0') || 'RE/' || t.local_way_id way_id,
+       h.hamlet_id hamlet_id
   from extra_toponym_city t
   join extra_config_graph cfg on 1=1
   join relation_tags m_name on m_name.k = 'name' and m_name.v = t.city
@@ -1771,6 +1837,7 @@ select distinct graph_uri, 'OS' || lpad(t.global_way_id::text,11,'0') || 'RE/' |
   join relation_members r on t.global_way_id  = r.member_id and r.member_type = 'W' 
   join relation_tags r_type on r.relation_id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'multipolygon'
   join relation_tags r_pedestrian on r.relation_id = r_pedestrian.relation_id and r_pedestrian.k = 'highway' and r_pedestrian.v = 'pedestrian'
+  join Hamlet h on h.hamlet_name = t.suburb and h.municipality_id = 'OS' || lpad(m.id::text,11,'0') || 'CO'
   where not ((t.suburb = '') IS NOT FALSE);
 
 /********** RoadElement.Route **********/
@@ -1865,6 +1932,77 @@ join extra_ways on highway.id = extra_ways.global_id and way_nodes.sequence_id -
 join relation_members r on highway.id = r.member_id and r.member_type = 'W' 
 join relation_tags r_type on r.relation_id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'multipolygon'
 join relation_tags r_pedestrian on r.relation_id = r_pedestrian.relation_id and r_pedestrian.k = 'highway' and r_pedestrian.v = 'pedestrian'
+;
+
+/*****************************************
+********* AdministrativeRoad *************
+*****************************************/
+
+drop table if exists AdministrativeRoad;
+
+Create Table AdministrativeRoad As
+select distinct 
+	cfg.graph_uri,
+	'OS' || lpad(rm.relation_id::text,11,'0') || 'LR/OS' || lpad(wt.way_id::text,11,'0') || 'AR' id,
+	wt.v ad_road_name,
+	lrn.extend_name alternative,
+	lrt.road_type admin_class,
+	'OS' || lpad(e.global_way_id::text,11,'0') || 'RE/' || e.local_way_id eid,
+	ma.municipality_id  
+from RoadRelationIdentifier lri
+join RoadRelationType lrt on lri.id = lrt.id
+join RoadRelationExtendName lrn on lri.id = lrn.id
+join relation_members rm on cast(substring(lri.id from 3 for 11) as integer) = rm.relation_id and rm.member_type='W'
+join way_tags wt on wt.way_id =  rm.member_id and wt.k = 'name'
+join extra_toponym_city e on wt.way_id = e.global_way_id
+join RoadElementManagingAuthority ma on ma.way_id = 'OS' || lpad(e.global_way_id::text,11,'0') || 'RE/' || e.local_way_id
+join extra_config_graph cfg on 1=1;
+
+drop table if exists AdministrativeRoadNameGeneric;
+
+create table AdministrativeRoadNameGeneric as
+select cfg.graph_uri, ar.id, max(g.naming) ad_road_name_generic
+from AdministrativeRoad ar
+join extra_generic_namings g on lower(ar.ad_road_name) like lower(g.naming) || '%'
+join extra_config_graph cfg on 1=1
+group by cfg.graph_uri, ar.id;
+
+drop table if exists AdministrativeRoadNameSpecific;
+
+create table AdministrativeRoadNameSpecific as
+select distinct cfg.graph_uri, ar.id, trim(substring(ar.ad_road_name from 1+char_length(argn.ad_road_name_generic))) ad_road_name_specific
+from AdministrativeRoad ar
+join AdministrativeRoadNameGeneric argn on ar.id = argn.id
+join extra_config_graph cfg on 1=1;
+
+/********** Road(WAY).RoadName **********/
+
+drop table if exists RoadWayName;
+
+create table RoadWayName As
+select distinct cfg.graph_uri graph_uri, 
+ 'OS' || lpad(wt.global_id::text,11,'0') || 'SR' id,  
+       way_name.v extend_name,
+trim(substring(way_name.v, 1+char_length(coalesce(RoadWayType.road_type,'')))) road_name
+  from extra_ways wt
+  join extra_way_names way_name on wt.global_id = way_name.way_id 
+  join extra_config_graph cfg on 1=1
+  left join RoadWayType on RoadWayType.graph_uri = cfg.graph_uri and RoadWayType.id = 'OS' || lpad(wt.global_id::text,11,'0') || 'SR' and RoadWayType.extend_name = way_name.v
+  left join 
+(
+select r_ways.member_id
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'highway'
+  join extra_toponym_city e on r_ways.member_id = e.global_way_id 
+ where COALESCE(r_route.v,'road') = 'road'
+   and COALESCE(r_network.v, '--') <> 'e-road' 
+   and rwt.v <> 'proposed'  
+) tbl on wt.global_id = tbl.member_id
+ where way_name.k='name' and tbl.member_id is null
 ;
 
 /****************************************
@@ -4763,6 +4901,470 @@ drop table if exists WayStreetNumberPlace ;
 Create Table WayStreetNumberPlace As
 select cfg.graph_uri, extra_streetnumbers_on_ways_without_street.*
   from extra_streetnumbers_on_ways_without_street
+  join extra_config_graph cfg on 1=1
+  join extra_config_civic_num on 1=1
+  where civic_num_source = 'Open Street Map'
+;
+
+/*******************************************************************************************
+*** Boundaries of residential, commercial, industrial, and administrative areas ************
+*******************************************************************************************/
+
+-- Adding geometries to Public Administrations
+----------------------------------------------
+
+drop table if exists RegionGeometry ;
+
+Create Table RegionGeometry As
+select distinct graph_uri, 'OS' || lpad(r.id::text,11,'0') || 'RG' id,
+       ST_AsText(eab.boundary) geometry
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'boundary'
+  join relation_tags r_boundary on r.id = r_boundary.relation_id and r_boundary.k = 'boundary' and r_boundary.v = 'administrative'
+  join relation_tags r_admin_level on r.id = r_admin_level.relation_id and r_admin_level.k = 'admin_level' and r_admin_level.v = '4'  
+  join extra_regioni region_of_interest on r.id = region_of_interest.relation_id 
+  join extra_all_boundaries eab on eab.relation_id = r.id 
+  join extra_config_graph cfg on 1=1
+;
+
+drop table if exists ProvinceGeometry ;
+
+Create Table ProvinceGeometry As
+select distinct graph_uri, 'OS' || lpad(r.id::text,11,'0') || 'PR' id,
+       ST_AsText(eab.boundary) geometry
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'boundary'
+  join relation_tags r_boundary on r.id = r_boundary.relation_id and r_boundary.k = 'boundary' and r_boundary.v = 'administrative'
+  join relation_tags r_admin_level on r.id = r_admin_level.relation_id and r_admin_level.k = 'admin_level' and r_admin_level.v = '6'
+  join extra_province prov_of_interest on r.id = prov_of_interest.relation_id 
+  join extra_all_boundaries eab on eab.relation_id = r.id 
+  join extra_config_graph cfg on 1=1
+;
+
+drop table if exists MunicipalityGeometry ;
+
+Create Table MunicipalityGeometry As
+select distinct graph_uri, 'OS' || lpad(r.id::text,11,'0') || 'CO' id,
+       ST_AsText(eab.boundary) geometry
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'boundary'
+  join relation_tags r_boundary on r.id = r_boundary.relation_id and r_boundary.k = 'boundary' and r_boundary.v = 'administrative'
+  join relation_tags r_admin_level on r.id = r_admin_level.relation_id and r_admin_level.k = 'admin_level' and r_admin_level.v = '8'  
+  join extra_comuni com_of_interest on r.id = com_of_interest.relation_id 
+  join extra_all_boundaries eab on eab.relation_id = r.id 
+  join extra_config_graph cfg on 1=1
+;
+
+-- NamedArea: ResidentialArea
+-----------------------------
+
+-- Relation site=housing
+
+drop table if exists ResidentialArea;
+
+Create Table ResidentialArea As
+select distinct graph_uri, 'OS' || lpad(extra_comuni.relation_id::text,11,'0') || 'CO' municipality_id, area_id, area_name, name_language, ST_AsText(ST_MakePolygon(ST_AddPoint(tmp.boundary, ST_PointN(tmp.boundary, 1)))) geometry, null linked_hamlet from (
+select distinct 
+	cfg.graph_uri, 
+	'OS' || lpad(r.id::text,11,'0') || 'RAR' area_id, 
+	r_name.v area_name, 
+	case when left(r_name.k,5) = 'name:' then substring(r_name.k from 6) else null end name_language, 
+	(ST_Dump(ST_GeomFromText(ST_AsText(ST_LineMerge(ST_Collect(ways.linestring))),4326))).geom boundary 
+from relations r
+join relation_tags r_site on r.id = r_site.relation_id and r_site.k = 'site' and r_site.v in ('housing')
+left join relation_tags r_name on r.id = r_name.relation_id and r_name.k like 'name%'
+left join relation_tags r_admin_level on r.id = r_admin_level.relation_id and r_admin_level.k = 'admin_level'
+join relation_members r_ways on r_ways.relation_id = r.id and r_ways.member_type = 'W'
+join ways on r_ways.member_id = ways.id
+join extra_config_graph cfg on 1=1
+where cast(coalesce(r_admin_level.v,'10') as int) > 8
+group by cfg.graph_uri, r.id, r_name.v, r_name.k
+) tmp
+join extra_comuni on ST_Intersects(extra_comuni.boundary, tmp.boundary);
+
+-- Relation landuse=centre_zone|residential
+
+insert into ResidentialArea 
+select distinct graph_uri, 'OS' || lpad(extra_comuni.relation_id::text,11,'0') || 'CO' municipality_id, area_id, area_name, name_language, ST_AsText(ST_MakePolygon(ST_AddPoint(tmp.boundary, ST_PointN(tmp.boundary, 1)))) geometry, null linked_hamlet from (
+select distinct 
+	cfg.graph_uri, 
+	'OS' || lpad(r.id::text,11,'0') || 'RAR' area_id, 
+	r_name.v area_name, 
+	case when left(r_name.k,5) = 'name:' then substring(r_name.k from 6) else null end name_language, 
+	(ST_Dump(ST_GeomFromText(ST_AsText(ST_LineMerge(ST_Collect(ways.linestring))),4326))).geom boundary 
+from relations r
+join relation_tags r_landuse on r.id = r_landuse.relation_id and r_landuse.k = 'landuse' and r_landuse.v in ('centre_zone','residential')
+left join relation_tags r_name on r.id = r_name.relation_id and r_name.k like 'name%'
+left join relation_tags r_admin_level on r.id = r_admin_level.relation_id and r_admin_level.k = 'admin_level'
+join relation_members r_ways on r_ways.relation_id = r.id and r_ways.member_type = 'W'
+join ways on r_ways.member_id = ways.id
+join extra_config_graph cfg on 1=1
+left join ResidentialArea on ResidentialArea.area_id = 'OS' || lpad(r.id::text,11,'0') || 'RAR' 
+where ResidentialArea.area_id is null and cast(coalesce(r_admin_level.v,'10') as int) > 8
+group by cfg.graph_uri, r.id, r_name.v, r_name.k
+) tmp
+join extra_comuni on ST_Intersects(extra_comuni.boundary, tmp.boundary);
+
+-- Relation place=city|city_block|hamlet|isolated_dwelling|neighbourhood|quarter|suburb|town|village
+
+insert into ResidentialArea 
+select distinct graph_uri, 'OS' || lpad(extra_comuni.relation_id::text,11,'0') || 'CO' municipality_id, area_id, area_name, name_language, ST_AsText(ST_MakePolygon(ST_AddPoint(tmp.boundary, ST_PointN(tmp.boundary, 1)))) geometry, null linked_hamlet from (
+select distinct 
+	cfg.graph_uri, 
+	'OS' || lpad(r.id::text,11,'0') || 'RAR' area_id, 
+	r_name.v area_name, 
+	case when left(r_name.k,5) = 'name:' then substring(r_name.k from 6) else null end name_language, 
+	(ST_Dump(ST_GeomFromText(ST_AsText(ST_LineMerge(ST_Collect(ways.linestring))),4326))).geom boundary 
+from relations r
+join relation_tags r_place on r.id = r_place.relation_id and r_place.k = 'place' and r_place.v in ('city', 'city_block','hamlet','isolated_dwelling','neighbourhood','quarter','suburb','town','village')
+left join relation_tags r_name on r.id = r_name.relation_id and r_name.k like 'name%'
+left join relation_tags r_admin_level on r.id = r_admin_level.relation_id and r_admin_level.k = 'admin_level'
+join relation_members r_ways on r_ways.relation_id = r.id and r_ways.member_type = 'W'
+join ways on r_ways.member_id = ways.id
+join extra_config_graph cfg on 1=1
+left join ResidentialArea on ResidentialArea.area_id = 'OS' || lpad(r.id::text,11,'0') || 'RAR' 
+where ResidentialArea.area_id is null and cast(coalesce(r_admin_level.v,'10') as int) > 8
+group by cfg.graph_uri, r.id, r_name.v, r_name.k
+) tmp
+join extra_comuni on ST_Intersects(extra_comuni.boundary, tmp.boundary);
+
+-- Relation boundary=quarter|city_limit|civil|town|urban|limited_traffic_zone|village
+
+insert into ResidentialArea 
+select distinct graph_uri, 'OS' || lpad(extra_comuni.relation_id::text,11,'0') || 'CO' municipality_id, area_id, area_name, name_language, ST_AsText(ST_MakePolygon(ST_AddPoint(tmp.boundary, ST_PointN(tmp.boundary, 1)))) geometry, null linked_hamlet from (
+select distinct 
+	cfg.graph_uri, 
+	'OS' || lpad(r.id::text,11,'0') || 'RAR' area_id, 
+	r_name.v area_name, 
+	case when left(r_name.k,5) = 'name:' then substring(r_name.k from 6) else null end name_language, 
+	(ST_Dump(ST_GeomFromText(ST_AsText(ST_LineMerge(ST_Collect(ways.linestring))),4326))).geom boundary 
+from relations r
+join relation_tags r_boundary on r.id = r_boundary.relation_id and r_boundary.k = 'boundary' and r_boundary.v in ('quarter','city_limit','civil','town','urban','limited_traffic_zone','village')
+left join relation_tags r_name on r.id = r_name.relation_id and r_name.k like 'name%'
+left join relation_tags r_admin_level on r.id = r_admin_level.relation_id and r_admin_level.k = 'admin_level'
+join relation_members r_ways on r_ways.relation_id = r.id and r_ways.member_type = 'W'
+join ways on r_ways.member_id = ways.id
+join extra_config_graph cfg on 1=1
+left join ResidentialArea on ResidentialArea.area_id = 'OS' || lpad(r.id::text,11,'0') || 'RAR' 
+where ResidentialArea.area_id is null and cast(coalesce(r_admin_level.v,'10') as int) > 8
+group by cfg.graph_uri, r.id, r_name.v, r_name.k
+) tmp
+join extra_comuni on ST_Intersects(extra_comuni.boundary, tmp.boundary);
+
+-- Relation boundary=administrative, admin_level>8
+
+insert into ResidentialArea 
+select distinct graph_uri, 'OS' || lpad(extra_comuni.relation_id::text,11,'0') || 'CO' municipality_id, area_id, area_name, name_language, ST_AsText(ST_MakePolygon(ST_AddPoint(tmp.boundary, ST_PointN(tmp.boundary, 1)))) geometry, null linked_hamlet from (
+select distinct 
+	cfg.graph_uri, 
+	'OS' || lpad(r.id::text,11,'0') || 'RAR' area_id, 
+	r_name.v area_name, 
+	case when left(r_name.k,5) = 'name:' then substring(r_name.k from 6) else null end name_language, 
+	(ST_Dump(ST_GeomFromText(ST_AsText(ST_LineMerge(ST_Collect(ways.linestring))),4326))).geom boundary 
+from relations r
+join relation_tags r_boundary on r.id = r_boundary.relation_id and r_boundary.k = 'boundary' and r_boundary.v in ('administrative')
+join relation_tags r_admin_level on r.id = r_admin_level.relation_id and r_admin_level.k = 'admin_level' and cast(r_admin_level.v as int) > 8
+left join relation_tags r_name on r.id = r_name.relation_id and r_name.k like 'name%'
+join relation_members r_ways on r_ways.relation_id = r.id and r_ways.member_type = 'W'
+join ways on r_ways.member_id = ways.id
+join extra_config_graph cfg on 1=1
+left join ResidentialArea on ResidentialArea.area_id = 'OS' || lpad(r.id::text,11,'0') || 'RAR' 
+where ResidentialArea.area_id is null 
+group by cfg.graph_uri, r.id, r_name.v, r_name.k
+) tmp
+join extra_comuni on ST_Intersects(extra_comuni.boundary, tmp.boundary);
+
+-- Way site=housing
+
+insert into ResidentialArea 
+select distinct graph_uri, 'OS' || lpad(extra_comuni.relation_id::text,11,'0') || 'CO' municipality_id, area_id, area_name, name_language, ST_AsText(ST_MakePolygon(ST_AddPoint(tmp.boundary, ST_PointN(tmp.boundary, 1)))) geometry, null linked_hamlet from (
+select distinct 
+	cfg.graph_uri, 
+	'OS' || lpad(w.id::text,11,'0') || 'RAW' area_id, 
+	w_name.v area_name, 
+	case when left(w_name.k,5) = 'name:' then substring(w_name.k from 6) else null end name_language, 
+	w.linestring boundary 
+from ways w
+join way_tags w_site on w.id = w_site.way_id and w_site.k = 'site' and w_site.v in ('housing')
+left join way_tags w_name on w.id = w_name.way_id and w_name.k like 'name%'
+left join relation_members rm on rm.member_id = w.id and rm.member_type = 'W'
+left join ResidentialArea ra on ra.area_id = 'OS' || lpad(rm.relation_id::text,11,'0') || 'RAR'
+join extra_config_graph cfg on 1=1
+where ra.area_id is null
+group by cfg.graph_uri, w.id, w_name.v, w_name.k
+) tmp
+join extra_comuni on ST_Intersects(extra_comuni.boundary, tmp.boundary);
+
+-- Way landuse=centre_zone|residential
+
+insert into ResidentialArea 
+select distinct graph_uri, 'OS' || lpad(extra_comuni.relation_id::text,11,'0') || 'CO' municipality_id, area_id, area_name, name_language, ST_AsText(ST_MakePolygon(ST_AddPoint(tmp.boundary, ST_PointN(tmp.boundary, 1)))) geometry, null linked_hamlet from (
+select distinct 
+	cfg.graph_uri, 
+	'OS' || lpad(w.id::text,11,'0') || 'RAW' area_id, 
+	w_name.v area_name, 
+	case when left(w_name.k,5) = 'name:' then substring(w_name.k from 6) else null end name_language, 
+	w.linestring boundary 
+from ways w
+join way_tags w_landuse on w.id = w_landuse.way_id and w_landuse.k = 'landuse' and w_landuse.v in ('centre_zone','residential')
+left join way_tags w_name on w.id = w_name.way_id and w_name.k like 'name%'
+left join relation_members rm on rm.member_id = w.id and rm.member_type = 'W'
+left join ResidentialArea rar on rar.area_id = 'OS' || lpad(rm.relation_id::text,11,'0') || 'RAR'
+left join ResidentialArea raw on raw.area_id = 'OS' || lpad(w.id::text,11,'0') || 'RAW' 
+join extra_config_graph cfg on 1=1
+where rar.area_id is null and raw.area_id is null
+group by cfg.graph_uri, w.id, w_name.v, w_name.k
+) tmp
+join extra_comuni on ST_Intersects(extra_comuni.boundary, tmp.boundary);
+
+-- Way place=city|city_block|hamlet|isolated_dwelling|neighbourhood|quarter|suburb|town|village
+
+insert into ResidentialArea 
+select distinct graph_uri, 'OS' || lpad(extra_comuni.relation_id::text,11,'0') || 'CO' municipality_id, area_id, area_name, name_language, ST_AsText(ST_MakePolygon(ST_AddPoint(tmp.boundary, ST_PointN(tmp.boundary, 1)))) geometry, null linked_hamlet from (
+select distinct 
+	cfg.graph_uri, 
+	'OS' || lpad(w.id::text,11,'0') || 'RAW' area_id, 
+	w_name.v area_name, 
+	case when left(w_name.k,5) = 'name:' then substring(w_name.k from 6) else null end name_language, 
+	w.linestring boundary 
+from ways w
+join way_tags w_place on w.id = w_place.way_id and w_place.k = 'place' and w_place.v in ('city', 'city_block','hamlet','isolated_dwelling','neighbourhood','quarter','suburb','town','village')
+left join way_tags w_name on w.id = w_name.way_id and w_name.k like 'name%'
+left join relation_members rm on rm.member_id = w.id and rm.member_type = 'W'
+left join ResidentialArea rar on rar.area_id = 'OS' || lpad(rm.relation_id::text,11,'0') || 'RAR'
+left join ResidentialArea raw on raw.area_id = 'OS' || lpad(w.id::text,11,'0') || 'RAW' 
+join extra_config_graph cfg on 1=1
+where rar.area_id is null and raw.area_id is null
+group by cfg.graph_uri, w.id, w_name.v, w_name.k
+) tmp
+join extra_comuni on ST_Intersects(extra_comuni.boundary, tmp.boundary);
+
+-- Way boundary=quarter|city_limit|civil|town|urban|limited_traffic_zone|village
+
+insert into ResidentialArea 
+select distinct graph_uri, 'OS' || lpad(extra_comuni.relation_id::text,11,'0') || 'CO' municipality_id, area_id, area_name, name_language, ST_AsText(ST_MakePolygon(ST_AddPoint(tmp.boundary, ST_PointN(tmp.boundary, 1)))) geometry, null linked_hamlet from (
+select distinct 
+	cfg.graph_uri, 
+	'OS' || lpad(w.id::text,11,'0') || 'RAW' area_id, 
+	w_name.v area_name, 
+	case when left(w_name.k,5) = 'name:' then substring(w_name.k from 6) else null end name_language, 
+	w.linestring boundary 
+from ways w
+join way_tags w_place on w.id = w_place.way_id and w_place.k = 'boundary' and w_place.v in ('quarter','city_limit','civil','town','urban','limited_traffic_zone','village')
+left join way_tags w_name on w.id = w_name.way_id and w_name.k like 'name%'
+left join relation_members rm on rm.member_id = w.id and rm.member_type = 'W'
+left join ResidentialArea rar on rar.area_id = 'OS' || lpad(rm.relation_id::text,11,'0') || 'RAR'
+left join ResidentialArea raw on raw.area_id = 'OS' || lpad(w.id::text,11,'0') || 'RAW' 
+join extra_config_graph cfg on 1=1
+where rar.area_id is null and raw.area_id is null
+group by cfg.graph_uri, w.id, w_name.v, w_name.k
+) tmp
+join extra_comuni on ST_Intersects(extra_comuni.boundary, tmp.boundary);
+
+update ResidentialArea
+set linked_hamlet = linked_hamlets.hamlet_id, area_name = coalesce(linked_hamlets.area_name, linked_hamlets.hamlet_name)
+from (
+select c.area_id, c.area_name, nullif(array_to_string(array_agg(distinct h.hamlet_id), '|'),'') hamlet_id, nullif(array_to_string(array_agg(distinct h.hamlet_name), ', '),'') hamlet_name
+from ResidentialArea c
+left join Hamlet h
+on ST_Intersects(ST_GeomFromText(c.geometry,4326), ST_SetSRID(ST_MakePoint(h.long, h.lat),4326))
+group by c.area_id, c.area_name
+) linked_hamlets
+where ResidentialArea.area_id = linked_hamlets.area_id;
+
+-- NamedArea: IndustrialArea
+----------------------------
+
+-- Relation landuse=industrial
+
+drop table if exists IndustrialArea;
+
+Create Table IndustrialArea As
+select distinct graph_uri, 'OS' || lpad(extra_comuni.relation_id::text,11,'0') || 'CO' municipality_id, area_id, area_name, name_language, ST_AsText(ST_MakePolygon(ST_AddPoint(tmp.boundary, ST_PointN(tmp.boundary, 1)))) geometry, null linked_hamlet from (
+select distinct 
+	cfg.graph_uri, 
+	'OS' || lpad(r.id::text,11,'0') || 'IAR' area_id, 
+	r_name.v area_name, 
+	case when left(r_name.k,5) = 'name:' then substring(r_name.k from 6) else null end name_language, 
+	(ST_Dump(ST_GeomFromText(ST_AsText(ST_LineMerge(ST_Collect(ways.linestring))),4326))).geom boundary 
+from relations r
+join relation_tags r_landuse on r.id = r_landuse.relation_id and r_landuse.k = 'landuse' and r_landuse.v in ('industrial')
+left join relation_tags r_name on r.id = r_name.relation_id and r_name.k like 'name%'
+join relation_members r_ways on r_ways.relation_id = r.id and r_ways.member_type = 'W'
+join ways on r_ways.member_id = ways.id
+join extra_config_graph cfg on 1=1
+group by cfg.graph_uri, r.id, r_name.v, r_name.k
+) tmp
+join extra_comuni on ST_Intersects(extra_comuni.boundary, tmp.boundary);
+
+-- Way landuse=industrial
+
+insert into IndustrialArea 
+select distinct graph_uri, 'OS' || lpad(extra_comuni.relation_id::text,11,'0') || 'CO' municipality_id, area_id, area_name, name_language, ST_AsText(ST_MakePolygon(ST_AddPoint(tmp.boundary, ST_PointN(tmp.boundary, 1)))) geometry, null linked_hamlet from (
+select distinct 
+	cfg.graph_uri, 
+	'OS' || lpad(w.id::text,11,'0') || 'IAW' area_id, 
+	w_name.v area_name, 
+	case when left(w_name.k,5) = 'name:' then substring(w_name.k from 6) else null end name_language, 
+	w.linestring boundary 
+from ways w
+join way_tags w_landuse on w.id = w_landuse.way_id and w_landuse.k = 'landuse' and w_landuse.v in ('industrial')
+left join way_tags w_name on w.id = w_name.way_id and w_name.k like 'name%'
+left join relation_members rm on rm.member_id = w.id and rm.member_type = 'W'
+left join ResidentialArea ra on ra.area_id = 'OS' || lpad(rm.relation_id::text,11,'0') || 'IAR'
+join extra_config_graph cfg on 1=1
+where ra.area_id is null
+group by cfg.graph_uri, w.id, w_name.v, w_name.k
+) tmp
+join extra_comuni on ST_Intersects(extra_comuni.boundary, tmp.boundary);
+
+update IndustrialArea
+set area_name = coalesce(area_industries.area_name, area_industries.industry_names)
+from (
+select c.area_id, c.area_name, nullif(array_to_string(array_agg(distinct wname.v),', '),'') industry_names
+from IndustrialArea c
+join ways w on ST_Intersects(ST_GeomFromText(c.geometry,4326), w.linestring)
+join way_tags wname on w.id = wname.way_id and wname.k = 'name' 
+join way_tags wbuilding on w.id = wbuilding.way_id and wbuilding.k = 'building' 
+group by c.area_id, c.area_name
+) area_industries
+where IndustrialArea.area_id = area_industries.area_id;
+
+update IndustrialArea
+set linked_hamlet = linked_hamlets.hamlet_id, area_name = coalesce(linked_hamlets.area_name, linked_hamlets.hamlet_name)
+from (
+select c.area_id, c.area_name, nullif(array_to_string(array_agg(distinct h.hamlet_id), '|'),'') hamlet_id, nullif(array_to_string(array_agg(distinct h.hamlet_name), ', '),'') hamlet_name
+from IndustrialArea c
+left join Hamlet h
+on ST_Intersects(ST_GeomFromText(c.geometry,4326), ST_SetSRID(ST_MakePoint(h.long, h.lat),4326))
+group by c.area_id, c.area_name
+) linked_hamlets
+where IndustrialArea.area_id = linked_hamlets.area_id;
+
+-- NamedArea: CommercialArea
+----------------------------
+
+-- Relation landuse=retail,commercial
+
+drop table if exists CommercialArea;
+
+Create Table CommercialArea As
+select distinct graph_uri, 'OS' || lpad(extra_comuni.relation_id::text,11,'0') || 'CO' municipality_id, area_id, area_name, name_language, ST_AsText(ST_MakePolygon(ST_AddPoint(tmp.boundary, ST_PointN(tmp.boundary, 1)))) geometry, null linked_hamlet from (
+select distinct 
+	cfg.graph_uri, 
+	'OS' || lpad(r.id::text,11,'0') || 'CAR' area_id, 
+	r_name.v area_name, 
+	case when left(r_name.k,5) = 'name:' then substring(r_name.k from 6) else null end name_language, 
+	(ST_Dump(ST_GeomFromText(ST_AsText(ST_LineMerge(ST_Collect(ways.linestring))),4326))).geom boundary 
+from relations r
+join relation_tags r_landuse on r.id = r_landuse.relation_id and r_landuse.k = 'landuse' and r_landuse.v in ('retail','commercial')
+left join relation_tags r_name on r.id = r_name.relation_id and r_name.k like 'name%'
+join relation_members r_ways on r_ways.relation_id = r.id and r_ways.member_type = 'W'
+join ways on r_ways.member_id = ways.id
+join extra_config_graph cfg on 1=1
+group by cfg.graph_uri, r.id, r_name.v, r_name.k
+) tmp
+join extra_comuni on ST_Intersects(extra_comuni.boundary, tmp.boundary);
+
+-- Way landuse=commercial
+
+insert into CommercialArea 
+select distinct graph_uri, 'OS' || lpad(extra_comuni.relation_id::text,11,'0') || 'CO' municipality_id, area_id, area_name, name_language, ST_AsText(ST_MakePolygon(ST_AddPoint(tmp.boundary, ST_PointN(tmp.boundary, 1)))) geometry, null linked_hamlet from (
+select distinct 
+	cfg.graph_uri, 
+	'OS' || lpad(w.id::text,11,'0') || 'CAW' area_id, 
+	w_name.v area_name, 
+	case when left(w_name.k,5) = 'name:' then substring(w_name.k from 6) else null end name_language, 
+	w.linestring boundary 
+from ways w
+join way_tags w_landuse on w.id = w_landuse.way_id and w_landuse.k = 'landuse' and w_landuse.v in ('retail','commercial')
+left join way_tags w_name on w.id = w_name.way_id and w_name.k like 'name%'
+left join relation_members rm on rm.member_id = w.id and rm.member_type = 'W'
+left join ResidentialArea ra on ra.area_id = 'OS' || lpad(rm.relation_id::text,11,'0') || 'CAR'
+join extra_config_graph cfg on 1=1
+where ra.area_id is null
+group by cfg.graph_uri, w.id, w_name.v, w_name.k
+) tmp
+join extra_comuni on ST_Intersects(extra_comuni.boundary, tmp.boundary);
+
+update CommercialArea
+set area_name = coalesce(area_shops.area_name, area_shops.shop_names)
+from (
+select c.area_id, c.area_name, nullif(array_to_string(array_agg(distinct wname.v),', '),'') shop_names
+from CommercialArea c
+join ways w on ST_Intersects(ST_GeomFromText(c.geometry,4326), w.linestring)
+join way_tags wname on w.id = wname.way_id and wname.k = 'name' 
+join way_tags wbuilding on w.id = wbuilding.way_id and wbuilding.k = 'building' 
+group by c.area_id, c.area_name
+) area_shops
+where CommercialArea.area_id = area_shops.area_id;
+
+update CommercialArea
+set linked_hamlet = linked_hamlets.hamlet_id, area_name = coalesce(linked_hamlets.area_name, linked_hamlets.hamlet_name)
+from (
+select c.area_id, c.area_name, nullif(array_to_string(array_agg(distinct h.hamlet_id), '|'),'') hamlet_id, nullif(array_to_string(array_agg(distinct h.hamlet_name), ', '),'') hamlet_name
+from CommercialArea c
+left join Hamlet h
+on ST_Intersects(ST_GeomFromText(c.geometry,4326), ST_SetSRID(ST_MakePoint(h.long, h.lat),4326))
+group by c.area_id, c.area_name
+) linked_hamlets
+where CommercialArea.area_id = linked_hamlets.area_id;
+
+-- Street numbers from building names
+-------------------------------------
+
+drop table if exists extra_streetnumbers_on_building_names;
+
+create table extra_streetnumbers_on_building_names as
+select * from ( 
+	select 
+		'OS' || lpad(ways.id::text,11,'0') || 'BN' cn_id, 
+		housenumber.v extend_number, 
+		substring(housenumber.v FROM '[0-9]+') number,
+		substring(housenumber.v FROM '[a-zA-Z]+') exponent,
+		COALESCE(long_roads.road_id,short_roads.road_id) road_id,
+		CASE 
+			WHEN municipalities.m_name = any ('{Firenze,Genova,Savona}') and housenumber.v ilike '%r%' THEN 'Rosso'
+			WHEN municipalities.m_name = any ('{Firenze,Genova,Savona}') and not housenumber.v ilike '%r%' THEN 'Nero'
+			ELSE 'Privo colore'
+		END as class_code,
+		'OS' || lpad(nodes.id::text,11,'0') || 'BE' en_id,  
+		'Accesso esterno diretto'::text entry_type,
+		ST_X(nodes.geom) long,
+		ST_Y(nodes.geom) lat,
+		CASE 
+			WHEN motor.node_id is not null 
+			THEN 'Accesso carrabile' 
+			ELSE 'Accesso non carrabile' 
+		END as porte_cochere, 
+		CASE 
+			WHEN long_roads.road_id is null 
+			THEN 'OS' || lpad(short_roads.a_global_way_id::text,11,'0') || 'RE/' || short_roads.a_local_way_id 
+			ELSE 'OS' || lpad(long_roads.a_global_way_id::text,11,'0') || 'RE/' || long_roads.a_local_way_id 
+		END as re_id,
+		'Open Street Map'::text node_source,
+		'--'::text native_node_ref,
+		dense_rank() over (partition by ways.id, nodes.id order by ST_Distance(nodes.geom, COALESCE(long_roads.a_way_route,nodes.geom)), long_roads.road_id) as long_roads_way_rank,
+		dense_rank() over (partition by ways.id, nodes.id order by ST_Distance(nodes.geom, COALESCE(short_roads.a_way_route,nodes.geom)), short_roads.road_id) as short_roads_way_rank,
+		dense_rank() over (partition by ways.id order by coalesce(entrance.v,'ZZZ'), coalesce(motor.v,'ZZZ'), ST_Distance(nodes.geom, COALESCE(short_roads.a_way_route, long_roads.a_way_route )), way_nodes.sequence_id) as node_rank
+	from ways
+		join way_tags building on ways.id=building.way_id and building.k = 'building'
+		join way_tags housenumber on ways.id = housenumber.way_id and housenumber.k = 'name' and housenumber.v ~ '^[0-9]{1,4}[a-zA-Z]{0,1}$'
+		join way_nodes on ways.id = way_nodes.way_id and way_nodes.sequence_id = 0
+		join nodes on way_nodes.node_id = nodes.id
+		join extra_civicnum_municipalities municipalities on ST_Covers(municipalities.geom, nodes.geom)
+		left join node_tags entrance on nodes.id = entrance.node_id and entrance.k in ('entrance','building','barrier')
+		left join node_tags motor on nodes.id = motor.node_id and motor.k in ('motorcycle','motorcar')
+		left join extra_tmp_1 long_roads on municipalities.relation_id = long_roads.municipality_relation_id and ST_Distance(long_roads.a_way_route,nodes.geom,false) < 100
+		left join extra_tmp_2 short_roads on municipalities.relation_id = short_roads.municipality_relation_id and ST_Distance(short_roads.a_way_route,nodes.geom,false) < 100
+		where COALESCE(long_roads.road_id,short_roads.road_id,'--') <> '--'
+) q where long_roads_way_rank = 1 and short_roads_way_rank = 1 and node_rank = 1;
+
+drop table if exists BuildingNameStreetNumberRoad;
+
+Create Table BuildingNameStreetNumberRoad As
+select cfg.graph_uri,extra_streetnumbers_on_building_names.*
+  from extra_streetnumbers_on_building_names
   join extra_config_graph cfg on 1=1
   join extra_config_civic_num on 1=1
   where civic_num_source = 'Open Street Map'
