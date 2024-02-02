@@ -1,0 +1,69 @@
+version: "3.8"
+
+name: kg-open-street-map
+services:
+  postgres:
+          image: postgis/postgis:15-3.3
+          build:
+            #directory base, con il . è la stessa del compose.yml
+            context: . 
+          shm_size: 1g
+          environment:
+            - POSTGRES_USER=admin
+            - POSTGRES_PASSWORD=AdMiNpwd
+            # - POSTGRES_SHARED_BUFFERS=2GB
+            # - POSTGRES_WORK_MEM=256MB
+            # - POSTGRES_EFFECTIVE_CACHE_SIZE=4GB
+          logging:
+            options:
+              max-size: 10m
+              max-file: "3"
+          ports:
+            - '54320:5432'
+          volumes: 
+            - postgres-data:/var/lib/postgresql/data
+  
+  osm2km4c:
+        image: disitlab/osm2km4c-builder:v0
+        build:
+          #directory base, con il . è la stessa del compose.yml
+          context: . 
+          dockerfile: Dockerfile_osm2km4c
+        volumes:
+          - ./maps:/osm2km4c/maps
+          - ./osm:/osm2km4c/virtuoso-osm
+          - ./scripts:/osm2km4c/scripts
+        environment:
+          - DB_USER=admin
+          - DB_PASSWORD=AdMiNpwd
+          - DB_NAME=maps
+          - VIRTUOSO_PSW=virpwd
+          - VIRTUOSO_HOST=virtuoso
+        command: tail -F anything
+        # modificanto l'entrypoint il container appena viene lanciato esegue lo script 
+        # entrypoint: sh -c "/osm2km4c/scripts/init.sh"    
+
+  virtuoso:
+          image: openlink/virtuoso-opensource-7
+          environment:
+            - DBA_PASSWORD=virpwd
+          ports:
+            - '1112:1111'
+            - '8899:8890'
+          volumes: 
+            - virtuoso-data:/database
+            - ./osm:/database/osm
+  pgadmin:
+         image: dpage/pgadmin4:7.1
+         environment:
+           - PGADMIN_DEFAULT_EMAIL=test@gmail.com
+           - PGADMIN_DEFAULT_PASSWORD=admin
+           - PGADMIN_DEFAULT_SERVER=postgres
+           - PGADMIN_CONFIG_ON_DEMAND_RECORD_COUNT=100000
+         ports:
+           - "5050:80"
+         depends_on:
+           - postgres
+volumes:
+  postgres-data:
+  virtuoso-data:

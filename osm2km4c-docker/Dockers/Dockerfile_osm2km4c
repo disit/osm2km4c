@@ -1,0 +1,16 @@
+FROM ubuntu:22.04
+ARG DEBIAN_FRONTEND=noninteractive
+
+#RUN apt-get update && apt-get install -y
+RUN apt-get update
+RUN apt-get install postgresql-client -y
+RUN apt-get install openjdk-11-jdk -y
+RUN apt-get install wget -y
+RUN apt-get install unzip -y
+RUN apt-get install curl -y
+RUN apt-get install jq -y
+RUN apt-get install virtuoso-opensource-7-bin -y
+RUN apt-get install python3-pip -y
+RUN pip install requests
+COPY scripts /osm2km4c/scripts
+COPY tools /osm2km4c/tools
