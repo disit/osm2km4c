@@ -17,12 +17,16 @@ def parse_arguments():
                                  formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument("-f", "--file_name",
-                        help="Copy the map as .pbf file in /osm2km4c/maps/",
+                        help="Copy the map as .osm.pbf file in /osm2km4c/maps/",
                         nargs=1,
                         type=str)
     
     parser.add_argument("-r", "--relation_name",
                         help="Give the name of a relation to be downloaded from OSM, to choose a specific osm_id use --osm_id.",
+                        nargs=1,
+                        type=str)
+    parser.add_argument("-d", "--db",
+                        help="Give the ip:port,db,user,password of the server",
                         nargs=1,
                         type=str)
     
@@ -45,17 +49,19 @@ def parse_arguments():
     args = parser.parse_args()
 
 
-    if not (args.relation_name or args.osm_id):
-        parser.error("No action to do, specify RELATION_NAME or OSM_ID or filename")
+    if not (args.relation_name or args.osm_id or args.db):
+        parser.error("No action to do, specify RELATION_NAME or OSM_ID or filename or db")
     elif args.relation_name and args.osm_id:
         parser.error("RELATION_NAME and OSM_ID specified, provide only one of the two options")
+    elif args.db and not args.osm_id:
+        parser.error("specify -o OSM_ID with boundary to extract")
 
     return vars(args)
     
 def get_relation_data_by_name(relation_name):
-    json = requests.get(f"https://nominatim.openstreetmap.org/search.php?q={relation_name}&format=json").json()
+    json = requests.get(f"https://nominatim.openstreetmap.org/search.php?q={relation_name}&format=json", headers = {"User-Agent": "osm2km4c/0.1"}).json()
     #filtro per estrarre la relazione
-    print("for", relation_name,"found:")
+    print("for", relation_name, "found:")
     for osm_element in json:
         if (osm_element["osm_type"] == "relation" and osm_element["class"] == "boundary"):
             print("  ", osm_element["osm_id"], ":", osm_element["display_name"])
@@ -67,15 +73,18 @@ def get_relation_data_by_name(relation_name):
             return relation_data
 
 def get_relation_data_by_osmid(osm_id):
-    response = requests.get(f"https://nominatim.openstreetmap.org/lookup?osm_ids=R{osm_id}&format=json").json()
-    relation_data = response[0]
-    if relation_data["osm_type"] != "relation":
-        print(f"Error osm_id : {osm_id} is not a relation")
+    response = requests.get(f"https://nominatim.openstreetmap.org/lookup?osm_ids=R{osm_id}&format=json",headers = {"User-Agent": "osm2km4c/0.1"})
+    if response.status_code==200:
+        relation_data = response.json()[0]
+        if relation_data["osm_type"] != "relation":
+            print(f"Error osm_id : {osm_id} is not a relation")
+            exit(-1)
+        elif relation_data["class"] != "boundary":
+            print(f"Error osm_id : {osm_id} is not a boundary")
+            exit(-1)
+    else:
+        print(f"failed request to https://nominatim.openstreetmap.org/lookup?osm_ids=R{osm_id}&format=json code:", response.status_code, response.text)
         exit(-1)
-    elif relation_data["class"] != "boundary":
-        print(f"Error osm_id : {osm_id} is not a boundary")
-        exit(-1)
-
     return relation_data
     
 
@@ -154,6 +163,7 @@ def main():
     osm_id = args["osm_id"]
     map_type = None
     bbox = [0, 0, 0, 0]
+    db = args["db"]
     
 
     if args["load_to_rdf"] != None:
@@ -171,6 +181,10 @@ def main():
         osm_id = osm_id[0]
         relation_data = get_relation_data_by_osmid(osm_id)
     bbox = relation_data["boundingbox"]
+    db_host = ''
+    db_database = ''
+    db_user = ''
+    db_pwd = ''
 
     # Se file_name è specificato si verifica che la mappa esista
     if file_name != None:
@@ -181,6 +195,19 @@ def main():
             print(f"File /osm2km4c/maps/{file_name} not found")
             exit(-1)
     # Se non è specificato file_name la mappa viene scaricata automaticamente
+    elif db != None :
+        map_type = "apidb"
+        file_name = f"{osm_id}.osm"
+        db_options = db[0].split(',')
+        if len(db_options) >= 4 :
+            db_host = db_options[0]
+            db_database = db_options[1]
+            db_user = db_options[2]
+            db_pwd = db_options[3]
+            print("using database host:", db_host, "db:", db_database, "user:", db_user, "pwd:", db_pwd)
+        else:
+            print("error: invalid db options ", db[0], "expected: <host>:<port>,<database>,<user>,<password>")
+            exit(-1)
     else:
         download_map(osm_id, bbox)
         file_name = f"{osm_id}.osm"
@@ -215,7 +242,7 @@ def main():
     execute_shell_command(["bash", "-c", "/osm2km4c/scripts/init.sh"], handle_exit_number=True)
     # Effettuiamo il load della mappa e l'ottimizzazione del db
     file_name_cleaned = file_name.split(".")[0]
-    execute_shell_command(["bash", "-c", f"/osm2km4c/scripts/load_map.sh {osm_id} {file_name_cleaned} {map_type} {float(bbox[0])} {float(bbox[1])} {float(bbox[2])} {float(bbox[3])}"], handle_exit_number=True)
+    execute_shell_command(["bash", "-c", f"/osm2km4c/scripts/load_map.sh {osm_id} {file_name_cleaned} {map_type} {float(bbox[0])} {float(bbox[1])} {float(bbox[2])} {float(bbox[3])} {db_host} {db_database} {db_user} {db_pwd}"], handle_exit_number=True)
     # Eseguiamo una serie di query sul db e la triplificazione 
     execute_shell_command(["bash", "-c", f"/osm2km4c/scripts/irdbcmap.sh {osm_id} {file_name_cleaned} {generate_old}"], handle_exit_number=True)
 

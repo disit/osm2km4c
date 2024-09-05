@@ -16,7 +16,7 @@ GRAPH_EXISTS=$(echo $GRAPH_EXISTS | grep -oP 'ask_retval INTEGER _*?\K ([10])')
 if [ "$GRAPH_EXISTS" -eq 1 ];
     then
         # Il grafo contiene già delle triple,le eliminiamo 
-        echo "\nELIMINAZIONE TRIPLE DA VECCHIO GRAFO $GRAPH_NAME.n3\n"
+        echo "\nELIMINAZIONE TRIPLE DA VECCHIO GRAFO $GRAPH_NAME\n"
         echo "SPARQL CLEAR GRAPH <$GRAPH_NAME>;" | isql-vt isql-vt -H $VIRTUOSO_HOST -P $VIRTUOSO_PSW
     fi
 

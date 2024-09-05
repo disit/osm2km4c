@@ -13,7 +13,9 @@
 
    You should have received a copy of the GNU Affero General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-   
+
+create index relation_members_type on relation_members(relation_id, member_type);
+
 -- Boundaries
 
 drop table if exists extra_all_boundaries_dump;

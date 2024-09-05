@@ -8,7 +8,7 @@ OSM_ID=$1
 RELATION_NAME=$2
 GENERATE_OLD=$3
 
-echo OSM2KM4C START IRDBCMAP $(date -Is)
+echo OSM2KM4C START IRDBCMAP $(date -Is) OSM_ID: $OSM_ID RELATION_NAME: $RELATION_NAME
 # Generazione delle triple senza semplificazione se l'utente l'ha richiesto
 if [ $GENERATE_OLD = "True" ]; then
   psql postgresql://$DB_USER:$DB_PASSWORD@postgres:5432/$DB_NAME  -f /osm2km4c/scripts/irdbcmap_old.sql -v OSM_ID=$OSM_ID -v ON_ERROR_STOP=1 ||

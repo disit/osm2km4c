@@ -5408,3 +5408,130 @@ select cfg.graph_uri,extra_streetnumbers_on_building_names.*
   join extra_config_civic_num on 1=1
   where civic_num_source = 'Open Street Map'
 ;
+
+
+
+/* TRAM */
+drop table if exists extra_ways_tram;
+
+create table extra_ways_tram as
+select prev_waynode.way_id global_id, prev_waynode.sequence_id local_id, prev_node.geom start_node, next_node.geom end_node, prev_node.id prev_node_id, next_node.id next_node_id
+from way_nodes prev_waynode 
+join nodes prev_node on prev_waynode.node_id = prev_node.id
+join way_nodes next_waynode on prev_waynode.way_id = next_waynode.way_id and prev_waynode.sequence_id = next_waynode.sequence_id-1
+join nodes next_node on next_waynode.node_id = next_node.id
+join way_tags on prev_waynode.way_id = way_tags.way_id and way_tags.k = 'railway' and way_tags.v in ('tram')
+join extra_config_boundaries boundaries on ST_Covers(boundaries.boundary, next_node.geom);
+
+insert into extra_toponym_city(global_way_id, local_way_id, city)
+select railways.global_id global_way_id,
+railways.local_id local_way_id,
+nome_comune.v city 
+from 
+(
+-- ways in relation tram
+select extra_ways_tram.global_id, extra_ways_tram.local_id, 
+extra_ways_tram.start_node start_pt,
+extra_ways_tram.end_node end_pt
+from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'railway'
+  join extra_ways_tram on rwt.way_id = extra_ways_tram.global_id 
+) railways
+join extra_comuni comuni on ST_Covers(comuni.boundary, railways.start_pt) or ST_Covers(comuni.boundary, railways.end_pt)
+join relation_tags nome_comune on comuni.relation_id = nome_comune.relation_id and nome_comune.k = 'name';
+
+drop table if exists TramRelationElementType ;
+
+Create Table TramRelationElementType As
+select distinct graph_uri, 
+	'OS' || lpad(extra_ways_tram.global_id::text,11,'0') || 'RE/' || extra_ways_tram.local_id road_element_id,
+	rwt.v railway_element_type,
+	'OS' || lpad(r.id::text,11,'0') || 'TR' road_id,
+  round(ST_Distance(extra_ways_tram.start_node::geography,extra_ways_tram.end_node::geography)) length
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'railway'
+  join extra_ways_tram on extra_ways_tram.global_id = r_ways.member_id
+  join extra_config_graph cfg on 1=1
+;
+
+drop table if exists TramRelation ;
+
+Create Table TramRelation As
+select distinct graph_uri, 
+	'OS' || lpad(r.id::text,11,'0') || 'TR' road_id,
+	r_name.v road_name
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  join relation_tags r_name on r.id = r_name.relation_id and r_name.k = 'name'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'railway' and rwt.v = 'tram'
+  join extra_config_graph cfg on 1=1
+;
+
+drop table if exists TramRoadElementStartsAtNode ;
+
+Create Table TramRoadElementStartsAtNode As
+select distinct graph_uri,
+'OS' || lpad(railway.way_id::text,11,'0') || 'RE/' || way_nodes.sequence_id way_id, 
+'OS' || lpad(nodes.id::text,11,'0') || 'NO' start_node_id, 
+'terminale (inizio o fine elemento stradale)' node_type,
+ST_X(nodes.geom) long,
+ST_Y(nodes.geom) lat
+from way_tags railway 
+join extra_config_graph cfg on 1=1
+join way_nodes on railway.way_id = way_nodes.way_id 
+join nodes on way_nodes.node_id = nodes.id
+join extra_ways_tram on railway.way_id = extra_ways_tram.global_id and way_nodes.sequence_id = extra_ways_tram.local_id
+where railway.k = 'railway' and railway.v = 'tram'
+;
+
+/********** RoadElement.EndsAtNode **********/
+
+drop table if exists TramRoadElementEndsAtNode ;
+
+Create Table TramRoadElementEndsAtNode As
+select distinct graph_uri,
+'OS' || lpad(railway.way_id::text,11,'0') || 'RE/' || (way_nodes.sequence_id-1) way_id, 
+'OS' || lpad(nodes.id::text,11,'0') || 'NO' end_node_id, 
+'terminale (inizio o fine elemento stradale)' node_type,
+ST_X(nodes.geom) long,
+ST_Y(nodes.geom) lat
+from way_tags railway 
+  join extra_config_graph cfg on 1=1
+join (select distinct global_way_id from extra_toponym_city) e on railway.way_id = e.global_way_id 
+join way_nodes on railway.way_id = way_nodes.way_id and way_nodes.sequence_id > 0
+join nodes on way_nodes.node_id = nodes.id
+join extra_ways_tram on railway.way_id = extra_ways_tram.global_id and way_nodes.sequence_id - 1 = extra_ways_tram.local_id
+where railway.k = 'railway' and railway.v = 'tram'
+;
+
+drop table if exists TramRoadRelationInMunicipalityOf ;
+
+Create Table TramRoadRelationInMunicipalityOf As
+select distinct graph_uri, 'OS' || lpad(r.id::text,11,'0') || 'TR' road_id,
+       'OS' || lpad(m.id::text,11,'0') || 'CO' municipality_id,
+	   r_route.v
+  from relations r
+  join relation_tags r_type on r.id = r_type.relation_id and r_type.k = 'type' and r_type.v = 'route'
+  left join relation_tags r_route on r.id = r_route.relation_id and r_route.k = 'route'
+  left join relation_tags r_network on r.id = r_network.relation_id and r_network.k = 'network'
+  join relation_members r_ways on r.id = r_ways.relation_id and r_ways.member_type = 'W'
+  join way_tags rwt on r_ways.member_id = rwt.way_id and rwt.k = 'railway'
+  join extra_toponym_city t on r_ways.member_id = t.global_way_id
+  join relation_tags m_name on m_name.k = 'name' and m_name.v = t.city
+  join relations m on m_name.relation_id = m.id
+  join relation_tags m_type on m.id = m_type.relation_id and m_type.k = 'type' and m_type.v = 'boundary'
+  join relation_tags m_boundary on m.id = m_boundary.relation_id and m_boundary.k = 'boundary' and m_boundary.v = 'administrative'
+  join relation_tags m_admin_level on m.id = m_admin_level.relation_id and m_admin_level.k = 'admin_level' and m_admin_level.v = '8'
+  join extra_config_graph cfg on 1=1
+where COALESCE(r_route.v,'tram') = 'tram'
+;

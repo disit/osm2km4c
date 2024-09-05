@@ -1106,7 +1106,7 @@ select * from RelationStreetNumberRoad
 *********** StreetNumber e Entry ********
 *********** legati con la Road **********
 *********** attraverso il fatto che il **
-*********** nodo è giunzione della Way **
+*********** nodo ï¿½ giunzione della Way **
 ****************************************/
 
 Create view NodeStreetNumberRoad2 As
@@ -2380,4 +2380,125 @@ With
 
 From [[
 select * from BuildingNameStreetNumberRoad
+]]
+
+/********************************************/
+/*************** TRAM **********************/
+/********************************************/
+
+Create view TramRelationElementType As
+
+Construct {
+Graph ?graph_uri {
+?element a km4c:RoadElement .
+?element dct:identifier ?elementid .
+?element km4c:railwayType "tram" .
+?element km4c:composition "carreggiata unica" .
+?element km4c:trafficDir "tratto stradale aperto nella direzione positiva (da giunzione NOD_INI a giunzione NOD_FIN)" .
+?element km4c:elementType "13 di sede tramviaria" .
+?element km4c:operatingStatus "in esercizio" .
+?element km4c:length ?length.
+?road km4c:containsElement ?element .
+}}
+
+With 
+?graph_uri = uri(?graph_uri)
+?element = uri(concat("http://www.disit.org/km4city/resource/", ?road_element_id))
+?elementid = plainLiteral(?road_element_id)
+?road = uri(concat("http://www.disit.org/km4city/resource/", ?road_id))
+?length = plainLiteral(?length)
+
+From [[
+select * from TramRelationElementType
+]]
+
+Create view TramRelation As
+
+Construct {
+Graph ?graph_uri {
+?road a km4c:Road .
+?road km4c:railwayType "tram" .
+?road dct:identifier ?elementid .
+?road km4c:roadName ?name .
+}}
+
+With 
+?graph_uri = uri(?graph_uri)
+?elementid = plainLiteral(?road_id)
+?road = uri(concat("http://www.disit.org/km4city/resource/", ?road_id))
+?name = plainLiteral(?road_name)
+From [[
+select * from TramRelation
+]]
+
+/********** TramRoadElement.StartsAtNode **********/
+
+Create view TramRoadElementStartsAtNode As
+
+Construct {
+Graph ?graph_uri {
+?node a km4c:Node .
+?node dct:identifier ?nodeid .
+?node km4c:nodeType ?nodeType .
+?node geo:lat ?lat .
+?node geo:long ?long .
+?element km4c:startsAtNode ?node .
+}}
+
+With 
+?graph_uri = uri(?graph_uri)
+?node = uri(concat("http://www.disit.org/km4city/resource/", ?start_node_id))
+?nodeid = plainLiteral(?start_node_id)
+?nodeType = plainLiteral(?node_type)
+?long = typedLiteral(?long, "http://www.w3.org/2001/XMLSchema#float")
+?lat = typedLiteral(?lat, "http://www.w3.org/2001/XMLSchema#float")
+?element = uri(concat("http://www.disit.org/km4city/resource/", ?way_id))
+
+From [[
+select * from TramRoadElementStartsAtNode
+ ]] 
+
+/********** TramRoadElement.EndsAtNode **********/
+
+Create view TramRoadElementEndsAtNode As
+
+Construct {
+Graph ?graph_uri {
+?node a km4c:Node .
+?node dct:identifier ?nodeid .
+?node km4c:nodeType ?nodeType .
+?node geo:lat ?lat .
+?node geo:long ?long .
+?element km4c:endsAtNode ?node .
+}}
+
+With 
+?graph_uri = uri(?graph_uri)
+?node = uri(concat("http://www.disit.org/km4city/resource/", ?end_node_id))
+?nodeid = plainLiteral(?end_node_id)
+?nodeType = plainLiteral(?node_type)
+?long = typedLiteral(?long, "http://www.w3.org/2001/XMLSchema#float")
+?lat = typedLiteral(?lat, "http://www.w3.org/2001/XMLSchema#float")
+?element = uri(concat("http://www.disit.org/km4city/resource/", ?way_id))
+
+From [[
+select * from TramRoadElementEndsAtNode 
+ ]] 
+
+/********** TramRoad(RELATION).inMunicipalityOf  *********/
+
+Create view TramRoadRelationInMunicipalityOf As
+
+Construct {
+Graph ?graph_uri {
+?road km4c:inMunicipalityOf ?municipality 
+}}
+
+With
+?graph_uri = uri(?graph_uri)
+?road = uri(concat("http://www.disit.org/km4city/resource/", ?road_id))
+?municipality = uri(concat("http://www.disit.org/km4city/resource/", ?municipality_id))
+
+From [[
+select * from TramRoadRelationInMunicipalityOf
 ]]
