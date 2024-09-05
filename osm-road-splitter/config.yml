@@ -1,0 +1,20 @@
+initialDatabase:
+  host: localhost
+  database: openstreetmap
+  port: 5432
+  username: openstreetmap
+  password: openstreetmap
+
+destinationType: 'db' # 'db' | 'sql'
+# se è stato scelto sql verrà creato un output.sql nella directory ./out
+# e le opzioni destinationDatabase verrano ignorate
+
+# attenzione il db osm_splitted deve essere già presente ed essere un clone del db openstreetmap
+destinationDatabase:
+  host: localhost
+  database: osm_splitted
+  port: 5432
+  username: openstreetmap
+  password: openstreetmap
+
+savePhasesResult: true

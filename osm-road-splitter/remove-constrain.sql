@@ -1,0 +1,5 @@
+ALTER TABLE way_nodes DROP CONSTRAINT way_nodes_id_fkey;
+ALTER TABLE current_way_nodes DROP CONSTRAINT current_way_nodes_id_fkey;
+ALTER TABLE current_way_nodes DROP CONSTRAINT current_way_nodes_node_id_fkey;
+ALTER TABLE relation_members DROP CONSTRAINT relation_members_id_fkey;
+ALTER TABLE current_relation_members DROP CONSTRAINT current_relation_members_id_fkey;
