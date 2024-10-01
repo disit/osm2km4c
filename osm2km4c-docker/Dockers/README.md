@@ -22,13 +22,13 @@ options:
   --generate_old        Generate the triples for the old format (including all intermediate road elements)
 ```
 
-The triples are generated in the maps/<osmid>/<osmid>.n3 (always use --generate_old option, the new version is not fully supported by snap4city)
+The triples are generated in the `maps/<osm_id>/<osm_id>.n3` file (always use --generate_old option, the new version is not fully supported by snap4city)
 
 ## Example 1
 
 `docker compose exec osm2km4c /osm2km4c/scripts/osm2km4c.py -r Firenze -l urn:osm:firenze --generate_old`
 
-It automatically searches for a boundary relation and downloads the .osm file of "Firenze", processes it and uploads the triples on the local virtuoso instance.
+It automatically searches for a boundary relation with name "Firenze" and downloads the .osm file, it then processes the data and uploads the generated triples on the local virtuoso instance (processing takes a long time).
 
 ## Example 2
 
