@@ -48,7 +48,7 @@ If you want to split all the double way roads into two one-way roads, you should
 
 `docker compose exec osm-road-splitter bash -c "cd /snap4osm; ./clone-db.sh && ./run.sh" `
 
-Then to generate the triples for this splitted db you should use apidb access:
+It makes a clone of the db and then it performs the split by modifying the cloned db. Then to generate the triples for this splitted db you should use apidb access:
 
 `docker compose exec osm2km4c /osm2km4c/scripts/osm2km4c.py -db <hostname>:5432,openstreetmap_splitted,openstreetmap,openstreetmap -o 42602 -l urn:osm:firenze-splitted --generate_old`
 
