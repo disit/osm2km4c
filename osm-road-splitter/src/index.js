@@ -52,10 +52,34 @@ async function StartProcessData(args) {
     console.log('Loading config.yml');
     const fileData = fs.readFileSync(path.join(__dirname, '../config.yml'));
     const config = yaml.load(fileData);
+    if(process.env.INIDB_HOST)
+        config.initialDatabase.host = process.env.INIDB_HOST
+    if(process.env.INIDB_DATABASE)
+        config.initialDatabase.database = process.env.INIDB_DATABASE
+    if(process.env.INIDB_PORT)
+        config.initialDatabase.port = process.env.INIDB_PORT
+    if(process.env.INIDB_USER)
+        config.initialDatabase.user = process.env.INIDB_USER
+    if(process.env.INIDB_PASSWORD)
+        config.initialDatabase.password = process.env.INIDB_PASSWORD
+
+    if(process.env.DSTDB_HOST) {
+        config.destinationType = 'db'
+        config.destinationDatabase.host = process.env.DSTDB_HOST
+    }
+    if(process.env.DSTDB_DATABASE)
+        config.destinationDatabase.database = process.env.DSTDB_DATABASE
+    if(process.env.DSTDB_PORT)
+        config.destinationDatabase.port = process.env.DSTDB_PORT
+    if(process.env.DSTDB_USER)
+        config.destinationDatabase.user = process.env.DSTDB_USER
+    if(process.env.DSTDB_PASSWORD)
+        config.destinationDatabase.password = process.env.DSTDB_PASSWORD
+
     initaliDBConfig = config.initialDatabase;
     const destinationType = config.destinationType;
 
-    console.log('Testing inital database connection.');
+    console.log('Testing inital database connection to ' + initaliDBConfig.host);
     const savePhasesResult = config.savePhasesResult;
     let dbInitial = new DBClient(initaliDBConfig);
     await dbInitial.connect();
@@ -64,7 +88,7 @@ async function StartProcessData(args) {
 
     if (destinationType === 'db') {
         finalDBConfig = config.destinationDatabase;
-        console.log('Testing destination database connection.');
+        console.log('Testing destination database connection to '+finalDBConfig.host);
         let dbFinal = new DBClient(finalDBConfig);
         await dbFinal.connect();
         dbFinal.close();
@@ -237,9 +261,10 @@ async function StartProcessData(args) {
 
         const dbClient = new DBClient(initaliDBConfig);
         await dbClient.connect();
+	//console.log(relationsQuery);
         const relations = await dbClient.getQuery(relationsQuery);
         dbClient.close();
-
+        console.log("inverting relations");
         invertedRelation = {};
         let relationsToCopy = {};
         restrictions = {};
